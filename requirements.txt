@@ -1,0 +1,17 @@
+# Telegram client library (for userbots)
+telethon>=1.35.0
+
+# Telegram bot library (for control bot)
+aiogram>=3.4.0
+
+# Async HTTP client for Grok API
+aiohttp>=3.9.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# YAML configuration parsing
+pyyaml>=6.0.1
+
+# Optional: cryptography for better session security
+cryptography>=41.0.0

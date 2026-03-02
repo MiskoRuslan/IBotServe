@@ -1,0 +1,22 @@
+# Telegram group configuration
+group_id: -1005040113482  # Your target group ID (negative for supergroups)
+
+# Control Bot configuration
+control_bot:
+  enabled: true  # Enable control bot for managing userbots
+  admin_user_ids:  # List of Telegram user IDs who can use control bot
+    - 1562323420  # Replace with your Telegram user ID
+
+# AI behavior prompt - defines the discussion topic and style
+prompt: |
+  You are participating in a casual group discussion about technology and programming.
+  Keep messages natural, conversational, and contextually relevant to recent messages.
+  Avoid being overly formal. Use emojis sparingly. Keep responses concise (1-3 sentences).
+
+# Timing configuration
+delays:
+  min_seconds: 10   # Minimum seconds between messages
+  max_seconds: 40  # Maximum seconds between messages
+
+# Context configuration
+max_context_messages: 10  # Number of recent messages to keep in context for AI
