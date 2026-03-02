@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBotServe - Admin Panel</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>IBotServe</h1>
+                <p class="subtitle">Userbot Manager</p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>UserBots</h3>
+                <div id="userbots-list" class="userbots-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h2>Configuration Panel</h2>
+                <div class="header-actions">
+                    <button id="update-data-btn" class="btn btn-primary">
+                        <span class="btn-icon">🔄</span>
+                        Update Data
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Session Files</h3>
+                        <span id="session-count" class="badge">0</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Click "Update Data" to scan the sessions folder and import new userbots into the database.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="notification" class="notification hidden"></div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-userbots">0</div>
+                            <div class="stat-label">Total UserBots</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📁</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-sessions">0</div>
+                            <div class="stat-label">Session Files</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🔗</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-groups">0</div>
+                            <div class="stat-label">Groups</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
