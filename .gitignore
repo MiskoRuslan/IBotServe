@@ -211,3 +211,4 @@ sessions/
 ibotserve.db
 ibotserve_backup.db
 *.db
+.idea
