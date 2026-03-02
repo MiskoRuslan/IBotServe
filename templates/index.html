@@ -28,6 +28,10 @@
             <header class="header">
                 <h2>Configuration Panel</h2>
                 <div class="header-actions">
+                    <button id="create-group-btn" class="btn btn-success">
+                        <span class="btn-icon">➕</span>
+                        Create Group
+                    </button>
                     <button id="update-data-btn" class="btn btn-primary">
                         <span class="btn-icon">🔄</span>
                         Update Data
@@ -77,6 +81,41 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Modal for Creating Group -->
+    <div id="create-group-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Telegram Group</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <form id="create-group-form">
+                <div class="form-group">
+                    <label for="group-name">Group Name:</label>
+                    <input type="text" id="group-name" name="group-name" required placeholder="Enter group name">
+                </div>
+
+                <div class="form-group">
+                    <label for="admin-userbot">Admin (Creator):</label>
+                    <select id="admin-userbot" name="admin-userbot" required>
+                        <option value="">Select admin userbot...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="member-userbots">Members to add:</label>
+                    <div id="member-userbots" class="checkbox-group">
+                        <div class="loading">Loading userbots...</div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Group</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="/static/js/main.js"></script>
