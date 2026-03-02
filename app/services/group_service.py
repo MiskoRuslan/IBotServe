@@ -4,10 +4,16 @@ import random
 from pathlib import Path
 from typing import List, Dict
 from telethon import TelegramClient
-from telethon.tl.functions.messages import CreateChatRequest, AddChatUserRequest
-from telethon.tl.functions.contacts import ImportContactsRequest, DeleteContactsRequest
-from telethon.tl.types import InputPhoneContact
-from telethon.errors import UserAlreadyParticipantError, UserPrivacyRestrictedError
+from telethon.tl.functions.channels import CreateChannelRequest, InviteToChannelRequest
+from telethon.tl.functions.contacts import ImportContactsRequest
+from telethon.tl.types import InputPhoneContact, ChannelParticipantsAdmins
+from telethon.errors import (
+    UserAlreadyParticipantError,
+    UserPrivacyRestrictedError,
+    PeerFloodError,
+    ChatAdminRequiredError,
+    UserIdInvalidError
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,178 +35,133 @@ class GroupService:
         members_info: List[Dict[str, str]]
     ) -> int:
         """
-        Створити групу в Telegram та додати учасників
+        Створити супергрупу в Telegram та додати учасників
 
         Args:
             admin_phone: Номер телефону адміна (який створює групу)
             group_name: Назва групи
-            members_info: Список словників з інформацією про учасників
-                         [{"phone": "+123456", "name": "John Doe"}, ...]
+            members_info: Список словників [{"phone": "+380...", "name": "John Doe"}, ...]
 
         Returns:
-            int: Telegram chat_id створеної групи
+            int: Telegram chat_id створеної супергрупи (негативне число, наприклад -1001234567890)
         """
-        # Знайти сесію адміна
         admin_session_path = self._find_session_by_phone(admin_phone)
-        if not admin_session_path:
-            raise ValueError(f"Сесію для адміна {admin_phone} не знайдено")
 
-        # Створити клієнт для адміна
-        admin_client = TelegramClient(
+        client = TelegramClient(
             str(admin_session_path.with_suffix('')),
             self.api_id,
             self.api_hash
         )
 
-        chat_id = None
-
         try:
-            await admin_client.connect()
+            await client.connect()
 
-            if not await admin_client.is_user_authorized():
-                raise ValueError(f"Сесія адміна {admin_phone} не авторизована")
+            # ─── 1. Додати номери в контакти (полегшує подальший пошук) ───
+            print("Імпорт контактів...")
+            contacts = []
+            for i, info in enumerate(members_info):
+                phone = info.get('phone', '').lstrip('+')
+                name = info.get('name', 'User').strip()
+                parts = name.split(' ', 1)
+                first = parts[0]
+                last = parts[1] if len(parts) > 1 else ''
 
-            # Крок 1: Додати всіх учасників у контакти
-            print("Додавання учасників у контакти адміна...")
-            contacts_to_import = []
-
-            for i, member_info in enumerate(members_info):
-                member_phone = member_info.get('phone', '').lstrip('+')
-                member_name = member_info.get('name', 'User')
-
-                # Розділити ім'я на first та last
-                name_parts = member_name.split(' ', 1)
-                first_name = name_parts[0]
-                last_name = name_parts[1] if len(name_parts) > 1 else ''
-
-                contact = InputPhoneContact(
+                contacts.append(InputPhoneContact(
                     client_id=i,
-                    phone=member_phone,
-                    first_name=first_name,
-                    last_name=last_name
-                )
-                contacts_to_import.append(contact)
+                    phone=phone,
+                    first_name=first,
+                    last_name=last
+                ))
 
-            # Імпортувати всі контакти одразу
-            if contacts_to_import:
-                result = await admin_client(ImportContactsRequest(contacts_to_import))
-                print(f"Додано {len(result.users)} контактів")
+            if contacts:
+                await client(ImportContactsRequest(contacts))
+                await asyncio.sleep(1.2)  # невелика пауза після імпорту
 
-            # Крок 2: Отримати об'єкти користувачів
-            users_to_add = []
-            for member_info in members_info:
+            # ─── 2. Отримати InputUser для всіх учасників ───
+            users_input = []
+            for info in members_info:
+                phone = info.get('phone', '').strip()
+                if not phone.startswith('+'):
+                    phone = '+' + phone
                 try:
-                    member_phone = member_info.get('phone', '').lstrip('+')
-                    # Тепер користувач є в контактах, можемо його знайти
-                    user = await admin_client.get_entity(f'+{member_phone}')
-                    users_to_add.append(user)
-                    print(f"Знайдено користувача: {user.first_name or member_phone}")
+                    entity = await client.get_entity(phone)
+                    users_input.append(await client.get_input_entity(entity))
+                    print(f"OK → {entity.first_name or phone}")
                 except Exception as e:
-                    print(f"Не вдалося знайти користувача {member_phone}: {e}")
+                    print(f"Не вдалося отримати {phone}: {type(e).__name__} {e}")
                     continue
 
-            if not users_to_add:
-                raise ValueError("Жоден з учасників не знайдено")
+            if not users_input:
+                raise ValueError("Не вдалося отримати жодного дійсного користувача")
 
-            # Створити групу з першим учасником
-            print(f"Створення групи '{group_name}' з першим учасником...")
-            result = await admin_client(CreateChatRequest(
-                users=[users_to_add[0]],
-                title=group_name
+            # ─── 3. Створити супергрупу (megagroup=True) ───
+            print(f"Створюємо супергрупу '{group_name}'...")
+            created = await client(CreateChannelRequest(
+                title=group_name,
+                about="",
+                megagroup=True  # ← це ключовий момент!
             ))
 
-            # Почекати трохи, щоб група створилась
-            await asyncio.sleep(1)
+            # Отримуємо entity щойно створеної групи
+            group = created.chats[0]
+            group_input = await client.get_input_entity(group)
 
-            # Знайти створену групу через діалоги
-            print("Пошук створеної групи...")
-            chat_entity = None
-            chat_id = None
-            async for dialog in admin_client.iter_dialogs(limit=50):
-                if dialog.name == group_name and dialog.is_group:
-                    chat_entity = dialog.entity
-                    chat_id = dialog.id
-                    print(f"Знайдено групу '{group_name}' з ID: {chat_id}")
-                    print(f"Тип entity: {type(chat_entity)}")
-                    break
+            print(f"Створено супергрупу: {group.title} | ID: {group.id} | chat_id: {-1000000000000 - group.id}")
 
-            if not chat_entity or not chat_id:
-                raise ValueError(f"Не вдалося знайти створену групу '{group_name}'")
+            # ─── 4. Додавання учасників (крім себе, якщо ти вже там) ───
+            added = 0
+            failed = 0
 
-            # Додати інших учасників з рандомною затримкою
-            added_count = 0
-            failed_count = 0
-
-            for i, user in enumerate(users_to_add[1:], start=1):
+            for idx, user_input in enumerate(users_input, 1):
                 try:
-                    # Рандомна затримка від 2 до 7 секунд
-                    delay = random.uniform(2, 7)
-                    print(f"[{i}/{len(users_to_add)-1}] Очікування {delay:.2f} секунд перед додаванням наступного учасника...")
+                    delay = random.uniform(0.5, 1.5)
+                    print(f"[{idx}/{len(users_input)}] Очікування {delay:.1f}с...")
                     await asyncio.sleep(delay)
 
-                    # Додати учасника використовуючи entity групи
-                    print(f"Додавання користувача: {user.first_name or user.phone} (ID: {user.id})")
+                    await client(InviteToChannelRequest(
+                        channel=group_input,
+                        users=[user_input]
+                    ))
 
-                    # Спробувати різні методи додавання
-                    try:
-                        # Метод 1: Використати AddChatUserRequest
-                        await admin_client(AddChatUserRequest(
-                            chat_id=chat_id,
-                            user_id=user,
-                            fwd_limit=0
-                        ))
-                    except Exception as e1:
-                        print(f"  Метод 1 (AddChatUserRequest) не спрацював: {e1}")
-                        # Метод 2: Спробувати через високорівневий API
-                        try:
-                            await admin_client.edit_permissions(
-                                chat_entity,
-                                user,
-                                view_messages=True
-                            )
-                        except Exception as e2:
-                            print(f"  Метод 2 (edit_permissions) не спрацював: {e2}")
-                            raise e1  # Підняти оригінальну помилку
-
-                    added_count += 1
-                    print(f"✓ Успішно додано учасника: {user.first_name or user.phone}")
+                    added += 1
+                    print(f"✓ Додано")
 
                 except UserAlreadyParticipantError:
-                    print(f"ℹ Користувач {user.first_name or user.phone} вже є учасником")
-                    added_count += 1
+                    added += 1
+                    print(" вже в групі")
                 except UserPrivacyRestrictedError:
-                    failed_count += 1
-                    print(f"✗ Користувач {user.first_name or user.phone} має обмеження приватності")
-                    continue
+                    failed += 1
+                    print(" приватність забороняє додавання")
+                except PeerFloodError:
+                    print("!!! FLOOD WAIT — треба чекати кілька хвилин/годин !!!")
+                    failed += 1
+                    await asyncio.sleep(180)  # хоча б 2 хв
+                except ChatAdminRequiredError:
+                    print("!!! Потрібні права адміністратора (додавання учасників) !!!")
+                    raise
+                except UserIdInvalidError:
+                    print(" невалідний користувач")
+                    failed += 1
                 except Exception as e:
-                    failed_count += 1
-                    print(f"✗ ПОМИЛКА при додаванні учасника {user.first_name or user.phone}: {type(e).__name__}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
+                    failed += 1
+                    print(f"ПОМИЛКА: {type(e).__name__}: {e}")
 
-            print(f"\n=== Підсумок ===")
-            print(f"Всього учасників для додавання: {len(users_to_add)-1}")
-            print(f"Успішно додано: {added_count}")
-            print(f"Помилок: {failed_count}")
+            print("\n" + "═" * 50)
+            print(f"Усього цільових учасників: {len(users_input)}")
+            print(f"Успішно / вже були:     {added}")
+            print(f"Не вдалося:              {failed}")
+            print("═" * 50)
 
-            return chat_id
+            return -1000000000000 - group.id   # стандартний формат chat_id для супергруп
 
-        except Exception as e:
-            raise e
         finally:
-            if admin_client.is_connected():
-                await admin_client.disconnect()
+            if await client.is_connected():
+                await client.disconnect()
 
     def _find_session_by_phone(self, phone: str) -> Path | None:
-        """Знайти session файл за номером телефону"""
-        # Видалити + якщо є
         phone_clean = phone.lstrip('+')
-
-        # Спробувати знайти файл з + та без
-        for phone_variant in [f'+{phone_clean}', phone_clean]:
-            session_path = self.sessions_dir / f"{phone_variant}.session"
-            if session_path.exists():
-                return session_path
-
+        for variant in [f'+{phone_clean}', phone_clean]:
+            p = self.sessions_dir / f"{variant}.session"
+            if p.exists():
+                return p
         return None
