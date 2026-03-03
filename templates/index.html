@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBotServe - Admin Panel</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>IBotServe</h1>
+                <p class="subtitle">Userbot Manager</p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>UserBots</h3>
+                <div id="userbots-list" class="userbots-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h2>Configuration Panel</h2>
+                <div class="header-actions">
+                    <button id="create-group-btn" class="btn btn-success">
+                        <span class="btn-icon">➕</span>
+                        Create Group
+                    </button>
+                    <button id="contact-all-btn" class="btn btn-info">
+                        <span class="btn-icon">📞</span>
+                        Contact All
+                    </button>
+                    <button id="start-listeners-btn" class="btn btn-success">
+                        <span class="btn-icon">▶️</span>
+                        Start Listeners
+                    </button>
+                    <button id="stop-listeners-btn" class="btn btn-danger" style="display:none;">
+                        <span class="btn-icon">⏹️</span>
+                        Stop Listeners
+                    </button>
+                    <button id="update-data-btn" class="btn btn-primary">
+                        <span class="btn-icon">🔄</span>
+                        Update Data
+                    </button>
+                    <button id="upload-stickers-btn" class="btn btn-warning">
+                        <span class="btn-icon">🎭</span>
+                        Upload Stickers
+                    </button>
+                </div>
+            </header>
+
+            <div class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Session Files</h3>
+                        <span id="session-count" class="badge">0</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Click "Update Data" to scan the sessions folder and import new userbots into the database.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="notification" class="notification hidden"></div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-userbots">0</div>
+                            <div class="stat-label">Total UserBots</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">📁</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-sessions">0</div>
+                            <div class="stat-label">Session Files</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">🔗</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-groups">0</div>
+                            <div class="stat-label">Groups</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Groups</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="groups-list" class="groups-list">
+                            <div class="loading">Loading groups...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Creating Group -->
+    <div id="create-group-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Telegram Group</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <form id="create-group-form">
+                <div class="form-group">
+                    <label for="group-name">Group Name:</label>
+                    <input type="text" id="group-name" name="group-name" required placeholder="Enter group name">
+                </div>
+
+                <div class="form-group">
+                    <label for="global-prompt">Global Prompt (Optional):</label>
+                    <textarea id="global-prompt" name="global-prompt" rows="3" placeholder="Enter global prompt for this group..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="admin-userbot">Admin (Creator):</label>
+                    <select id="admin-userbot" name="admin-userbot" required>
+                        <option value="">Select admin userbot...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="member-userbots">Members to add:</label>
+                    <div id="member-userbots" class="checkbox-group">
+                        <div class="loading">Loading userbots...</div>
+                    </div>
+                </div>
+
+                <div class="form-section-header">
+                    <h4>Conversation Settings</h4>
+                </div>
+
+                <div class="form-group">
+                    <label for="context-messages">Context Messages Count:</label>
+                    <input type="number" id="context-messages" name="context-messages" value="10" min="1" max="50" placeholder="10">
+                    <small>Number of recent messages to use as context (default: 10)</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="min-delay">Min Delay (seconds):</label>
+                        <input type="number" id="min-delay" name="min-delay" value="10" min="1" max="300" placeholder="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="max-delay">Max Delay (seconds):</label>
+                        <input type="number" id="max-delay" name="max-delay" value="40" min="1" max="300" placeholder="40">
+                    </div>
+                </div>
+                <small>Random delay between messages (default: 10-40 seconds)</small>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contact All Progress Modal -->
+    <div id="contact-progress-modal" class="modal hidden">
+        <div class="modal-content progress-modal">
+            <div class="modal-header">
+                <h3>Adding Contacts</h3>
+                <button class="modal-close" id="progress-modal-close" disabled>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="progress-section">
+                    <div class="progress-info">
+                        <span id="progress-text">Initializing...</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+
+                <div class="progress-details">
+                    <div class="progress-stat">
+                        <span class="progress-label">Current:</span>
+                        <span id="current-userbot">-</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Progress:</span>
+                        <span id="progress-count">0 / 0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Success:</span>
+                        <span id="success-count" class="success-text">0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Skipped:</span>
+                        <span id="skipped-count" class="warning-text">0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Errors:</span>
+                        <span id="error-count" class="error-text">0</span>
+                    </div>
+                </div>
+
+                <div id="progress-log" class="progress-log"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="progress-close-btn" class="btn btn-primary" disabled>Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Group Prompt Modal -->
+    <div id="edit-group-prompt-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Group Prompt</h3>
+                <button class="modal-close" id="edit-group-prompt-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-group-prompt-text">Global Prompt:</label>
+                    <textarea id="edit-group-prompt-text" rows="5" placeholder="Enter global prompt for this group..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-group-prompt-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-group-prompt-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Member Prompt Modal -->
+    <div id="edit-member-prompt-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Member Prompt</h3>
+                <button class="modal-close" id="edit-member-prompt-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-member-prompt-text">Additional Prompt:</label>
+                    <textarea id="edit-member-prompt-text" rows="5" placeholder="Enter additional prompt for this member..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-member-prompt-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-member-prompt-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Stickers Modal -->
+    <div id="upload-stickers-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Global Stickers</h3>
+                <button class="modal-close" id="upload-stickers-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="stickers-info">
+                    <p>Upload TGS sticker files. Each emotion can have one sticker. All bots share these stickers.</p>
+                    <p><strong>Available emotions:</strong> laughter, sad, angry, love, surprised, confused, happy, thinking, crying, cool</p>
+                </div>
+
+                <div class="stickers-section">
+                    <h4>Upload New Sticker</h4>
+                    <form id="upload-sticker-form" enctype="multipart/form-data">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="upload-emotion">Emotion:</label>
+                                <select id="upload-emotion" required>
+                                    <option value="laughter">😂 Laughter</option>
+                                    <option value="sad">😢 Sad</option>
+                                    <option value="angry">😠 Angry</option>
+                                    <option value="love">❤️ Love</option>
+                                    <option value="surprised">😮 Surprised</option>
+                                    <option value="confused">😕 Confused</option>
+                                    <option value="happy">😊 Happy</option>
+                                    <option value="thinking">🤔 Thinking</option>
+                                    <option value="crying">😭 Crying</option>
+                                    <option value="cool">😎 Cool</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 2;">
+                                <label for="sticker-file">Sticker File (TGS):</label>
+                                <input type="file" id="sticker-file" accept=".tgs" required>
+                            </div>
+                            <div class="form-group" style="flex: 0; align-self: flex-end;">
+                                <button type="submit" class="btn btn-success">Upload</button>
+                            </div>
+                        </div>
+                    </form>
+                    <small>Upload animated Telegram stickers in TGS format. This will replace any existing sticker for this emotion.</small>
+                </div>
+
+                <div class="stickers-section">
+                    <h4>Current Stickers</h4>
+                    <div id="global-stickers-list" class="stickers-list">
+                        <div class="loading">Loading stickers...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="close-upload-stickers-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Userbot Style Settings Modal -->
+    <div id="edit-style-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Userbot Style Settings</h3>
+                <button class="modal-close" id="edit-style-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-allow-profanity">
+                            Allow profanity (use only when appropriate)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-punctuation" checked>
+                            Use punctuation marks
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-uppercase" checked>
+                            Use uppercase letters
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-send-photos">
+                            Send photos (10% chance, via Unsplash)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-gender">Gender:</label>
+                        <select id="style-gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-language">Language:</label>
+                        <select id="style-language">
+                            <option value="ukrainian">Ukrainian (Українська)</option>
+                            <option value="russian">Russian (Русский)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-send-stickers">
+                            Send stickers (15% chance, random from global collection)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-ascii-emoticons">
+                            Use ASCII emoticons :) :D
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-emoji-probability">
+                            Emoji usage probability: <span id="emoji-probability-value">0%</span>
+                        </label>
+                        <input type="range" id="style-emoji-probability" min="0" max="100" value="0" step="5">
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            How often to use emojis in messages (0% = never, 100% = very often)
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-youth-slang">
+                            Use youth slang (молодіжний сленг: типу, кайф, рофл, агонь)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-illiterate-slang">
+                            Use illiterate slang (неграмотний: шо, чо, спс, норм, ваще)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-typos">
+                            Use intentional typos (навмисні помарки: автомоюіль, привить)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-message-length">Message length:</label>
+                        <select id="style-message-length">
+                            <option value="short">Short (5-15 words)</option>
+                            <option value="medium" selected>Medium (1-3 sentences)</option>
+                            <option value="long">Long (3-5 sentences)</option>
+                            <option value="any">Any length</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-style-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-style-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ibotserve_db
+    environment:
+      POSTGRES_DB: ibotserve
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: ibotserve_app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/ibotserve
+      API_ID: ${API_ID}
+      API_HASH: ${API_HASH}
+      CONTROL_BOT_TOKEN: ${CONTROL_BOT_TOKEN}
+      GROK_API_KEY: ${GROK_API_KEY}
+      GROK_API_URL: ${GROK_API_URL}
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY}
+      UNSPLASH_APPLICATION_ID: ${UNSPLASH_APPLICATION_ID}
+      UNSPLASH_SECRET_KEY: ${UNSPLASH_SECRET_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./sessions:/app/sessions
+      - ./app:/app/app
+      - ./models:/app/models
+      - ./database:/app/database
+      - ./templates:/app/templates
+      - ./static:/app/static
+
+volumes:
+  postgres_data:
