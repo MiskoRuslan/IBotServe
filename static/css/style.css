@@ -806,3 +806,103 @@ form {
     color: var(--text-muted);
     font-size: 14px;
 }
+
+/* Group Status and Settings */
+.group-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.group-settings {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #000;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
+/* Form sections */
+.form-section-header {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.form-section-header h4 {
+    margin: 0 0 16px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Userbot Actions */
+.userbot-actions {
+    margin-top: 8px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.settings-grid .form-group {
+    margin-bottom: 0;
+}
+
+.settings-grid label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.settings-grid input[type=checkbox] {
+    width: auto;
+    cursor: pointer;
+}
+
+.settings-grid select {
+    margin-top: 4px;
+}

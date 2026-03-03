@@ -80,6 +80,15 @@ async function loadUserbots() {
                     Trusted ID: ${bot.trusted_id || '<em>Not set</em>'}
                     <button class="btn-icon-small" onclick="editTrustedId('${bot.id}', ${bot.trusted_id || 'null'})" title="Edit trusted ID">✏️</button>
                 </div>
+                <div class="userbot-actions">
+                    <button class="btn btn-sm btn-primary"
+                            data-userbot-id="${bot.id}"
+                            data-style-settings='${JSON.stringify(bot.style_settings)}'
+                            onclick="editStyleSettingsFromButton(this)"
+                            title="Edit style settings">
+                        ⚙️ Style Settings
+                    </button>
+                </div>
             </div>
         `).join('');
 
@@ -124,8 +133,16 @@ async function loadGroups() {
                         <h4 class="group-name">${group.name}</h4>
                         <span class="group-admin">Admin: ${group.admin_name || 'Unknown'}</span>
                         <span class="group-members-count">${group.members.length} members</span>
+                        <span class="group-status ${group.is_active ? 'status-active' : 'status-inactive'}">
+                            ${group.is_active ? '🟢 Active' : '🔴 Inactive'}
+                        </span>
                     </div>
                     <div class="group-actions">
+                        <button class="btn ${group.is_active ? 'btn-warning' : 'btn-success'}"
+                                onclick="toggleGroup('${group.id}')"
+                                title="${group.is_active ? 'Pause conversation' : 'Start conversation'}">
+                            ${group.is_active ? '⏸️ Pause' : '▶️ Start'}
+                        </button>
                         <button class="btn-icon" onclick="editGroupPrompt('${group.id}', '${escapeHtml(group.global_prompt)}')" title="Edit global prompt">
                             ✏️
                         </button>
@@ -136,6 +153,11 @@ async function loadGroups() {
                 </div>
                 <div class="group-prompt">
                     <strong>Global Prompt:</strong> ${group.global_prompt || '<em>No global prompt</em>'}
+                </div>
+                <div class="group-settings">
+                    <strong>Settings:</strong>
+                    Context: ${group.context_messages_count} msgs |
+                    Delay: ${group.min_delay_seconds}-${group.max_delay_seconds}s
                 </div>
                 <div class="group-members hidden" id="members-${group.id}">
                     ${group.members.map(member => `
@@ -360,7 +382,7 @@ async function loadUserbotsForModal() {
     }
 }
 
-async function createGroup(groupName, adminId, memberIds, globalPrompt = "") {
+async function createGroup(groupName, adminId, memberIds, globalPrompt = "", conversationSettings = {}) {
     try {
         const response = await fetch(`${API_BASE}/groups/create`, {
             method: 'POST',
@@ -371,7 +393,8 @@ async function createGroup(groupName, adminId, memberIds, globalPrompt = "") {
                 name: groupName,
                 admin_id: adminId,
                 member_ids: memberIds,
-                global_prompt: globalPrompt
+                global_prompt: globalPrompt,
+                ...conversationSettings
             }),
         });
 
@@ -409,6 +432,11 @@ createGroupForm.addEventListener('submit', async (e) => {
     const memberCheckboxes = document.querySelectorAll('#member-userbots input[type="checkbox"]:checked');
     const memberIds = Array.from(memberCheckboxes).map(cb => cb.value);
 
+    // Get conversation settings
+    const contextMessages = parseInt(document.getElementById('context-messages').value) || 10;
+    const minDelay = parseInt(document.getElementById('min-delay').value) || 10;
+    const maxDelay = parseInt(document.getElementById('max-delay').value) || 40;
+
     if (!groupName) {
         showNotification('Please enter group name', 'error');
         return;
@@ -424,12 +452,23 @@ createGroupForm.addEventListener('submit', async (e) => {
         return;
     }
 
+    if (minDelay > maxDelay) {
+        showNotification('Min delay must be less than or equal to max delay', 'error');
+        return;
+    }
+
     // Disable submit button
     const submitBtn = createGroupForm.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating...';
 
-    await createGroup(groupName, adminId, memberIds, globalPrompt);
+    const conversationSettings = {
+        context_messages_count: contextMessages,
+        min_delay_seconds: minDelay,
+        max_delay_seconds: maxDelay
+    };
+
+    await createGroup(groupName, adminId, memberIds, globalPrompt, conversationSettings);
 
     // Re-enable submit button
     submitBtn.disabled = false;
@@ -442,6 +481,30 @@ modal.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+// Group Conversation Management
+async function toggleGroup(groupId) {
+    try {
+        const response = await fetch(`${API_BASE}/groups/${groupId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification(data.message, 'success');
+            await loadGroups();
+        } else {
+            showNotification(data.detail || 'Failed to toggle group', 'error');
+        }
+    } catch (error) {
+        console.error('Error toggling group:', error);
+        showNotification('Failed to toggle group', 'error');
+    }
+}
 
 // Trusted ID Management
 async function editTrustedId(userbotId, currentTrustedId) {
@@ -717,5 +780,108 @@ progressCloseBtn.addEventListener('click', closeProgressModal);
 progressModal.addEventListener('click', (e) => {
     if (e.target === progressModal && !progressCloseBtn.disabled) {
         closeProgressModal();
+    }
+});
+
+
+// Style Settings Management
+const editStyleModal = document.getElementById('edit-style-modal');
+const editStyleClose = document.getElementById('edit-style-close');
+const editStyleCancel = document.getElementById('edit-style-cancel');
+const editStyleSave = document.getElementById('edit-style-save');
+
+let currentEditingUserbotId = null;
+
+function editStyleSettingsFromButton(button) {
+    const userbotId = button.dataset.userbotId;
+    const currentSettings = JSON.parse(button.dataset.styleSettings);
+    editStyleSettings(userbotId, currentSettings);
+}
+
+function editStyleSettings(userbotId, currentSettings) {
+    currentEditingUserbotId = userbotId;
+
+    // Fill form with current settings
+    document.getElementById('style-allow-profanity').checked = currentSettings.allow_profanity || false;
+    document.getElementById('style-use-punctuation').checked = currentSettings.use_punctuation !== false;
+    document.getElementById('style-use-uppercase').checked = currentSettings.use_uppercase !== false;
+    document.getElementById('style-send-photos').checked = currentSettings.send_photos || false;
+    document.getElementById('style-gender').value = currentSettings.gender || 'male';
+    document.getElementById('style-send-stickers').checked = currentSettings.send_stickers || false;
+    document.getElementById('style-use-ascii-emoticons').checked = currentSettings.use_ascii_emoticons || false;
+
+    // Set emoji probability slider and display
+    const emojiProbability = currentSettings.emoji_probability || 0;
+    document.getElementById('style-emoji-probability').value = emojiProbability;
+    document.getElementById('emoji-probability-value').textContent = `${emojiProbability}%`;
+
+    // Set new slang and typo settings
+    document.getElementById('style-use-youth-slang').checked = currentSettings.use_youth_slang || false;
+    document.getElementById('style-use-illiterate-slang').checked = currentSettings.use_illiterate_slang || false;
+    document.getElementById('style-use-typos').checked = currentSettings.use_typos || false;
+
+    document.getElementById('style-message-length').value = currentSettings.message_length || 'medium';
+
+    editStyleModal.classList.remove('hidden');
+}
+
+function closeStyleModal() {
+    editStyleModal.classList.add('hidden');
+    currentEditingUserbotId = null;
+}
+
+async function saveStyleSettings() {
+    if (!currentEditingUserbotId) return;
+    
+    const styleSettings = {
+        allow_profanity: document.getElementById('style-allow-profanity').checked,
+        use_punctuation: document.getElementById('style-use-punctuation').checked,
+        use_uppercase: document.getElementById('style-use-uppercase').checked,
+        send_photos: document.getElementById('style-send-photos').checked,
+        gender: document.getElementById('style-gender').value,
+        send_stickers: document.getElementById('style-send-stickers').checked,
+        use_ascii_emoticons: document.getElementById('style-use-ascii-emoticons').checked,
+        emoji_probability: parseInt(document.getElementById('style-emoji-probability').value) || 0,
+        message_length: document.getElementById('style-message-length').value
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE}/userbots/${currentEditingUserbotId}/style-settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                style_settings: styleSettings
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification('Style settings updated successfully', 'success');
+            closeStyleModal();
+            await loadUserbots();
+        } else {
+            showNotification(data.detail || 'Failed to update style settings', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating style settings:', error);
+        showNotification('Failed to update style settings', 'error');
+    }
+}
+
+editStyleClose.addEventListener('click', closeStyleModal);
+editStyleCancel.addEventListener('click', closeStyleModal);
+editStyleSave.addEventListener('click', saveStyleSettings);
+
+// Update emoji probability display when slider moves
+document.getElementById('style-emoji-probability').addEventListener('input', (e) => {
+    document.getElementById('emoji-probability-value').textContent = `${e.target.value}%`;
+});
+
+editStyleModal.addEventListener('click', (e) => {
+    if (e.target === editStyleModal) {
+        closeStyleModal();
     }
 });

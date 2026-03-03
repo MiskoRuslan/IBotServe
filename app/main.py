@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 from database import init_db
+from database.config import engine
 from app.routers import api
 from app.services.message_listener import message_listener
 
@@ -29,6 +30,13 @@ async def lifespan(app: FastAPI):
         print("[Shutdown] All message listeners stopped")
     except Exception as e:
         print(f"[Shutdown] Error stopping listeners: {e}")
+
+    # Close database connections
+    try:
+        await engine.dispose()
+        print("[Shutdown] Database connections closed")
+    except Exception as e:
+        print(f"[Shutdown] Error closing database: {e}")
 
 
 app = FastAPI(

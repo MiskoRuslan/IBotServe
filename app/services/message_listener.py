@@ -14,6 +14,17 @@ from app.services.grok_service import grok_service
 
 load_dotenv()
 
+# Import will be done lazily to avoid circular import
+conversation_service = None
+
+
+def get_conversation_service():
+    global conversation_service
+    if conversation_service is None:
+        from app.services.conversation_service import conversation_service as cs
+        conversation_service = cs
+    return conversation_service
+
 
 class MessageListenerService:
     """Service for listening to messages from trusted users"""
@@ -159,9 +170,25 @@ class MessageListenerService:
                             }
                         )
                         db.add(chat_history_entry)
+
+                        # Save group info before commit (to avoid detached instance issues)
+                        group_id_str = str(group.id)
+                        group_name = group.name
+                        is_active = group.is_active
+
                         await db.commit()
 
-                        print(f"[MessageListener] Saved to chat_history for group '{group.name}'")
+                        print(f"[MessageListener] Saved to chat_history for group '{group_name}'")
+                        print(f"[MessageListener] Group active status: {is_active}")
+
+                        # Start/restart conversation if group is active
+                        if is_active:
+                            print(f"[MessageListener] Starting conversation for group '{group_name}'...")
+                            conv_service = get_conversation_service()
+                            await conv_service.restart_conversation(group_id_str)
+                            print(f"[MessageListener] ✓ Conversation started for group '{group_name}'")
+                        else:
+                            print(f"[MessageListener] ✗ Group '{group_name}' is not active (is_active={is_active}), conversation not started")
 
                     except Exception as e:
                         print(f"[MessageListener] Error processing group '{group.name}': {e}")
@@ -187,7 +214,7 @@ class MessageListenerService:
 
             await client.connect()
 
-            if not client.is_user_authorized():
+            if not await client.is_user_authorized():
                 print(f"[MessageListener] Session not authorized for {phone}")
                 await client.disconnect()
                 return

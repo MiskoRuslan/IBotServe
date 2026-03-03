@@ -70,7 +70,7 @@ class ContactService:
         try:
             await client.connect()
 
-            if not client.is_user_authorized():
+            if not await client.is_user_authorized():
                 return {
                     'success': False,
                     'added': 0,

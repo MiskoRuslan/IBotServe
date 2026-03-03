@@ -138,6 +138,28 @@
                     </div>
                 </div>
 
+                <div class="form-section-header">
+                    <h4>Conversation Settings</h4>
+                </div>
+
+                <div class="form-group">
+                    <label for="context-messages">Context Messages Count:</label>
+                    <input type="number" id="context-messages" name="context-messages" value="10" min="1" max="50" placeholder="10">
+                    <small>Number of recent messages to use as context (default: 10)</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="min-delay">Min Delay (seconds):</label>
+                        <input type="number" id="min-delay" name="min-delay" value="10" min="1" max="300" placeholder="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="max-delay">Max Delay (seconds):</label>
+                        <input type="number" id="max-delay" name="max-delay" value="40" min="1" max="300" placeholder="40">
+                    </div>
+                </div>
+                <small>Random delay between messages (default: 10-40 seconds)</small>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
                     <button type="submit" class="btn btn-success">Create Group</button>
@@ -231,6 +253,114 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="edit-member-prompt-cancel">Cancel</button>
                 <button type="button" class="btn btn-primary" id="edit-member-prompt-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Userbot Style Settings Modal -->
+    <div id="edit-style-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Userbot Style Settings</h3>
+                <button class="modal-close" id="edit-style-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-allow-profanity">
+                            Allow profanity (use only when appropriate)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-punctuation" checked>
+                            Use punctuation marks
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-uppercase" checked>
+                            Use uppercase letters
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-send-photos" disabled>
+                            Send photos (not implemented yet)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-gender">Gender:</label>
+                        <select id="style-gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-send-stickers" disabled>
+                            Send stickers (not implemented yet)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-ascii-emoticons">
+                            Use ASCII emoticons :) :D
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-emoji-probability">
+                            Emoji usage probability: <span id="emoji-probability-value">0%</span>
+                        </label>
+                        <input type="range" id="style-emoji-probability" min="0" max="100" value="0" step="5">
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            How often to use emojis in messages (0% = never, 100% = very often)
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-youth-slang">
+                            Use youth slang (молодіжний сленг: типу, кайф, рофл, агонь)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-illiterate-slang">
+                            Use illiterate slang (неграмотний: шо, чо, спс, норм, ваще)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="style-use-typos">
+                            Use intentional typos (навмисні помарки: автомоюіль, привить)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="style-message-length">Message length:</label>
+                        <select id="style-message-length">
+                            <option value="short">Short (5-15 words)</option>
+                            <option value="medium" selected>Medium (1-3 sentences)</option>
+                            <option value="long">Long (3-5 sentences)</option>
+                            <option value="any">Any length</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-style-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-style-save">Save</button>
             </div>
         </div>
     </div>

@@ -23,7 +23,8 @@ class GrokService:
         self,
         trigger_message: str,
         global_prompt: Optional[str] = None,
-        member_prompt: Optional[str] = None
+        member_prompt: Optional[str] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Generate a natural human-like conversation starter based on trigger message.
@@ -32,31 +33,36 @@ class GrokService:
             trigger_message: Original message from trusted user
             global_prompt: Group's global prompt (context/rules)
             member_prompt: Member's additional prompt (personality/style)
+            custom_system_prompt: Full custom system prompt (overrides default)
 
         Returns:
             Generated natural message
         """
 
-        # Build system prompt
-        system_parts = [
-            "You are a helpful assistant that generates natural, human-like conversation starters.",
-            "Your task is to create a casual question or statement that a real person would write.",
-            "The message should be simple, conversational, and look completely natural.",
-            "DO NOT use formal language, overly complex sentences, or AI-like patterns.",
-            "Examples of good messages:",
-            "- 'Как зараз справи з транзитом нафти в Америці?'",
-            "- 'Порадьте хороший корм для мого спаніеля'",
-            "- 'Хто знає де купити якісні шини для джипа?'",
-            "- 'Цікаво, чи варто зараз інвестувати в біткоїн?'",
-        ]
+        # Use custom system prompt if provided, otherwise build default
+        if custom_system_prompt:
+            system_prompt = custom_system_prompt
+        else:
+            # Build system prompt
+            system_parts = [
+                "You are a helpful assistant that generates natural, human-like conversation starters.",
+                "Your task is to create a casual question or statement that a real person would write.",
+                "The message should be simple, conversational, and look completely natural.",
+                "DO NOT use formal language, overly complex sentences, or AI-like patterns.",
+                "Examples of good messages:",
+                "- 'Как зараз справи з транзитом нафти в Америці?'",
+                "- 'Порадьте хороший корм для мого спаніеля'",
+                "- 'Хто знає де купити якісні шини для джипа?'",
+                "- 'Цікаво, чи варто зараз інвестувати в біткоїн?'",
+            ]
 
-        if global_prompt:
-            system_parts.append(f"\nGroup context: {global_prompt}")
+            if global_prompt:
+                system_parts.append(f"\nGroup context: {global_prompt}")
 
-        if member_prompt:
-            system_parts.append(f"\nYour personality/style: {member_prompt}")
+            if member_prompt:
+                system_parts.append(f"\nYour personality/style: {member_prompt}")
 
-        system_prompt = "\n".join(system_parts)
+            system_prompt = "\n".join(system_parts)
 
         # Build user prompt
         user_prompt = f"""Based on this topic/instruction: "{trigger_message}"

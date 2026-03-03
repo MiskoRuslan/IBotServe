@@ -8,6 +8,7 @@ from app.services.session_service import SessionService
 from app.services.group_service import GroupService
 from app.services.contact_service import ContactService
 from app.services.message_listener import message_listener
+from app.services.conversation_service import conversation_service
 from database.managers.contacts_manager import ContactsManager
 from typing import List
 from pydantic import BaseModel
@@ -49,6 +50,9 @@ class CreateGroupRequest(BaseModel):
     admin_id: str
     member_ids: List[str]
     global_prompt: str = ""
+    context_messages_count: int = 10
+    min_delay_seconds: int = 10
+    max_delay_seconds: int = 40
 
 
 class CreateGroupResponse(BaseModel):
@@ -71,6 +75,7 @@ async def get_userbots(db: AsyncSession = Depends(get_db)):
                 "phone_number": bot.phone_number,
                 "username": bot.username,
                 "trusted_id": bot.trusted_id,
+                "style_settings": bot.style_settings,
                 "created_at": bot.created_at.isoformat()
             }
             for bot in userbots
@@ -205,7 +210,10 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
             name=request.name,
             telegram_id=telegram_chat_id,
             admin_id=UUID(request.admin_id),
-            global_prompt=request.global_prompt
+            global_prompt=request.global_prompt,
+            context_messages_count=request.context_messages_count,
+            min_delay_seconds=request.min_delay_seconds,
+            max_delay_seconds=request.max_delay_seconds
         )
         db.add(new_group)
         await db.flush()
@@ -298,6 +306,10 @@ async def get_groups(db: AsyncSession = Depends(get_db)):
                 "admin_name": admin_name,
                 "global_prompt": group.global_prompt or "",
                 "group_settings": group.group_settings,
+                "is_active": group.is_active,
+                "context_messages_count": group.context_messages_count,
+                "min_delay_seconds": group.min_delay_seconds,
+                "max_delay_seconds": group.max_delay_seconds,
                 "created_at": group.created_at.isoformat(),
                 "members": members_data
             })
@@ -410,6 +422,43 @@ async def update_userbot_trusted_id(
         raise HTTPException(status_code=500, detail=f"Error updating trusted ID: {str(e)}")
 
 
+@router.put("/userbots/{userbot_id}/style-settings")
+async def update_userbot_style_settings(
+    userbot_id: str,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Оновити style_settings юзербота
+    """
+    try:
+        result = await db.execute(
+            select(Userbot).where(Userbot.id == UUID(userbot_id))
+        )
+        userbot = result.scalar_one_or_none()
+
+        if not userbot:
+            raise HTTPException(status_code=404, detail="Userbot not found")
+
+        # Update style_settings
+        if "style_settings" in request:
+            userbot.style_settings = request["style_settings"]
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Style settings updated successfully",
+            "style_settings": userbot.style_settings
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating style settings: {str(e)}")
+
+
 @router.post("/listeners/start")
 async def start_listeners():
     """
@@ -516,3 +565,92 @@ async def contact_all(db: AsyncSession = Depends(get_db)):
             "X-Accel-Buffering": "no"
         }
     )
+
+
+@router.post("/groups/{group_id}/toggle")
+async def toggle_group(
+    group_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Toggle group active status (start/pause conversation)
+    """
+    try:
+        result = await db.execute(
+            select(Group).where(Group.id == UUID(group_id))
+        )
+        group = result.scalar_one_or_none()
+
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Toggle status
+        group.is_active = not group.is_active
+        await db.commit()
+
+        # Start or stop conversation
+        if group.is_active:
+            await conversation_service.start_conversation(group_id)
+            message = "Conversation started"
+        else:
+            await conversation_service.stop_conversation(group_id)
+            message = "Conversation paused"
+
+        return {
+            "success": True,
+            "is_active": group.is_active,
+            "message": message
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error toggling group: {str(e)}")
+
+
+@router.put("/groups/{group_id}/settings")
+async def update_group_settings(
+    group_id: str,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update group conversation settings
+    """
+    try:
+        result = await db.execute(
+            select(Group).where(Group.id == UUID(group_id))
+        )
+        group = result.scalar_one_or_none()
+
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Update settings
+        if "context_messages_count" in request:
+            group.context_messages_count = int(request["context_messages_count"])
+
+        if "min_delay_seconds" in request:
+            group.min_delay_seconds = int(request["min_delay_seconds"])
+
+        if "max_delay_seconds" in request:
+            group.max_delay_seconds = int(request["max_delay_seconds"])
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Group settings updated successfully",
+            "settings": {
+                "context_messages_count": group.context_messages_count,
+                "min_delay_seconds": group.min_delay_seconds,
+                "max_delay_seconds": group.max_delay_seconds
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating group settings: {str(e)}")
