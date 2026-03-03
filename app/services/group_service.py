@@ -155,7 +155,7 @@ class GroupService:
             return -1000000000000 - group.id   # стандартний формат chat_id для супергруп
 
         finally:
-            if await client.is_connected():
+            if client.is_connected():
                 await client.disconnect()
 
     def _find_session_by_phone(self, phone: str) -> Path | None:

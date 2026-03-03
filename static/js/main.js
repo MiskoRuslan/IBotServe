@@ -29,8 +29,21 @@ const successCountEl = document.getElementById('success-count');
 const skippedCountEl = document.getElementById('skipped-count');
 const errorCountEl = document.getElementById('error-count');
 const progressLog = document.getElementById('progress-log');
+const groupsList = document.getElementById('groups-list');
+const editGroupPromptModal = document.getElementById('edit-group-prompt-modal');
+const editGroupPromptClose = document.getElementById('edit-group-prompt-close');
+const editGroupPromptCancel = document.getElementById('edit-group-prompt-cancel');
+const editGroupPromptSave = document.getElementById('edit-group-prompt-save');
+const editGroupPromptText = document.getElementById('edit-group-prompt-text');
+const editMemberPromptModal = document.getElementById('edit-member-prompt-modal');
+const editMemberPromptClose = document.getElementById('edit-member-prompt-close');
+const editMemberPromptCancel = document.getElementById('edit-member-prompt-cancel');
+const editMemberPromptSave = document.getElementById('edit-member-prompt-save');
+const editMemberPromptText = document.getElementById('edit-member-prompt-text');
 
 let availableUserbots = [];
+let currentEditingGroupId = null;
+let currentEditingMemberId = null;
 
 function showNotification(message, type = 'info') {
     notificationEl.textContent = message;
@@ -85,6 +98,162 @@ async function loadStats() {
 
     } catch (error) {
         console.error('Error loading stats:', error);
+    }
+}
+
+async function loadGroups() {
+    try {
+        const response = await fetch(`${API_BASE}/groups`);
+        const data = await response.json();
+
+        if (data.groups.length === 0) {
+            groupsList.innerHTML = '<div class="no-data">No groups found</div>';
+            return;
+        }
+
+        groupsList.innerHTML = data.groups.map(group => `
+            <div class="group-item">
+                <div class="group-header">
+                    <div class="group-info">
+                        <h4 class="group-name">${group.name}</h4>
+                        <span class="group-admin">Admin: ${group.admin_name || 'Unknown'}</span>
+                        <span class="group-members-count">${group.members.length} members</span>
+                    </div>
+                    <div class="group-actions">
+                        <button class="btn-icon" onclick="editGroupPrompt('${group.id}', '${escapeHtml(group.global_prompt)}')" title="Edit global prompt">
+                            ✏️
+                        </button>
+                        <button class="btn-icon toggle-members" data-group-id="${group.id}">
+                            ▼
+                        </button>
+                    </div>
+                </div>
+                <div class="group-prompt">
+                    <strong>Global Prompt:</strong> ${group.global_prompt || '<em>No global prompt</em>'}
+                </div>
+                <div class="group-members hidden" id="members-${group.id}">
+                    ${group.members.map(member => `
+                        <div class="member-item">
+                            <div class="member-info">
+                                <span class="member-name">${member.userbot_name}${member.is_admin ? ' <span class="admin-badge">Admin</span>' : ''}</span>
+                                <span class="member-phone">${member.phone_number || ''}</span>
+                            </div>
+                            <div class="member-prompt">
+                                <strong>Prompt:</strong> ${member.additional_prompt || '<em>No additional prompt</em>'}
+                            </div>
+                            <button class="btn-icon" onclick="editMemberPrompt('${member.member_id}', '${escapeHtml(member.additional_prompt)}')" title="Edit member prompt">
+                                ✏️
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        // Додати обробники для розгортання/згортання мемберів
+        document.querySelectorAll('.toggle-members').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const groupId = e.target.dataset.groupId;
+                const membersDiv = document.getElementById(`members-${groupId}`);
+                membersDiv.classList.toggle('hidden');
+                e.target.textContent = membersDiv.classList.contains('hidden') ? '▼' : '▲';
+            });
+        });
+
+    } catch (error) {
+        console.error('Error loading groups:', error);
+        groupsList.innerHTML = '<div class="loading">Error loading groups</div>';
+        showNotification('Failed to load groups', 'error');
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+function editGroupPrompt(groupId, currentPrompt) {
+    currentEditingGroupId = groupId;
+    editGroupPromptText.value = currentPrompt || '';
+    editGroupPromptModal.classList.remove('hidden');
+}
+
+function closeEditGroupPromptModal() {
+    editGroupPromptModal.classList.add('hidden');
+    currentEditingGroupId = null;
+}
+
+async function saveGroupPrompt() {
+    if (!currentEditingGroupId) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/groups/${currentEditingGroupId}/prompt`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                global_prompt: editGroupPromptText.value
+            })
+        });
+
+        if (response.ok) {
+            showNotification('Group prompt updated successfully', 'success');
+            closeEditGroupPromptModal();
+            await loadGroups();
+        } else {
+            const data = await response.json();
+            showNotification(data.detail || 'Failed to update group prompt', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating group prompt:', error);
+        showNotification('Failed to update group prompt', 'error');
+    }
+}
+
+function editMemberPrompt(memberId, currentPrompt) {
+    currentEditingMemberId = memberId;
+    editMemberPromptText.value = currentPrompt || '';
+    editMemberPromptModal.classList.remove('hidden');
+}
+
+function closeEditMemberPromptModal() {
+    editMemberPromptModal.classList.add('hidden');
+    currentEditingMemberId = null;
+}
+
+async function saveMemberPrompt() {
+    if (!currentEditingMemberId) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/members/${currentEditingMemberId}/prompt`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                additional_prompt: editMemberPromptText.value
+            })
+        });
+
+        if (response.ok) {
+            showNotification('Member prompt updated successfully', 'success');
+            closeEditMemberPromptModal();
+            await loadGroups();
+        } else {
+            const data = await response.json();
+            showNotification(data.detail || 'Failed to update member prompt', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating member prompt:', error);
+        showNotification('Failed to update member prompt', 'error');
     }
 }
 
@@ -185,7 +354,7 @@ async function loadUserbotsForModal() {
     }
 }
 
-async function createGroup(groupName, adminId, memberIds) {
+async function createGroup(groupName, adminId, memberIds, globalPrompt = "") {
     try {
         const response = await fetch(`${API_BASE}/groups/create`, {
             method: 'POST',
@@ -195,7 +364,8 @@ async function createGroup(groupName, adminId, memberIds) {
             body: JSON.stringify({
                 name: groupName,
                 admin_id: adminId,
-                member_ids: memberIds
+                member_ids: memberIds,
+                global_prompt: globalPrompt
             }),
         });
 
@@ -228,6 +398,7 @@ createGroupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const groupName = document.getElementById('group-name').value.trim();
+    const globalPrompt = document.getElementById('global-prompt').value.trim();
     const adminId = adminSelect.value;
     const memberCheckboxes = document.querySelectorAll('#member-userbots input[type="checkbox"]:checked');
     const memberIds = Array.from(memberCheckboxes).map(cb => cb.value);
@@ -252,7 +423,7 @@ createGroupForm.addEventListener('submit', async (e) => {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating...';
 
-    await createGroup(groupName, adminId, memberIds);
+    await createGroup(groupName, adminId, memberIds, globalPrompt);
 
     // Re-enable submit button
     submitBtn.disabled = false;
@@ -266,9 +437,32 @@ modal.addEventListener('click', (e) => {
     }
 });
 
+// Edit Group Prompt Modal Event Listeners
+editGroupPromptClose.addEventListener('click', closeEditGroupPromptModal);
+editGroupPromptCancel.addEventListener('click', closeEditGroupPromptModal);
+editGroupPromptSave.addEventListener('click', saveGroupPrompt);
+
+editGroupPromptModal.addEventListener('click', (e) => {
+    if (e.target === editGroupPromptModal) {
+        closeEditGroupPromptModal();
+    }
+});
+
+// Edit Member Prompt Modal Event Listeners
+editMemberPromptClose.addEventListener('click', closeEditMemberPromptModal);
+editMemberPromptCancel.addEventListener('click', closeEditMemberPromptModal);
+editMemberPromptSave.addEventListener('click', saveMemberPrompt);
+
+editMemberPromptModal.addEventListener('click', (e) => {
+    if (e.target === editMemberPromptModal) {
+        closeEditMemberPromptModal();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUserbots();
     await loadStats();
+    await loadGroups();
 });
 
 setInterval(loadStats, 30000);

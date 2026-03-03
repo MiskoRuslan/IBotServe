@@ -1,6 +1,6 @@
-from sqlalchemy import String, BigInteger, ForeignKey
+from sqlalchemy import String, BigInteger, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from models.base import BaseModel
 
 
@@ -14,6 +14,8 @@ class Group(BaseModel):
         ForeignKey("userbots.id", ondelete="SET NULL"),
         nullable=True
     )
+    global_prompt: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
+    group_settings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
 
     members: Mapped[list["Member"]] = relationship(
         "Member",

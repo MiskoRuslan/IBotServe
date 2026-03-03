@@ -83,6 +83,17 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Groups</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="groups-list" class="groups-list">
+                            <div class="loading">Loading groups...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -98,6 +109,11 @@
                 <div class="form-group">
                     <label for="group-name">Group Name:</label>
                     <input type="text" id="group-name" name="group-name" required placeholder="Enter group name">
+                </div>
+
+                <div class="form-group">
+                    <label for="global-prompt">Global Prompt (Optional):</label>
+                    <textarea id="global-prompt" name="global-prompt" rows="3" placeholder="Enter global prompt for this group..."></textarea>
                 </div>
 
                 <div class="form-group">
@@ -167,6 +183,46 @@
             </div>
             <div class="modal-footer">
                 <button id="progress-close-btn" class="btn btn-primary" disabled>Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Group Prompt Modal -->
+    <div id="edit-group-prompt-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Group Prompt</h3>
+                <button class="modal-close" id="edit-group-prompt-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-group-prompt-text">Global Prompt:</label>
+                    <textarea id="edit-group-prompt-text" rows="5" placeholder="Enter global prompt for this group..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-group-prompt-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-group-prompt-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Member Prompt Modal -->
+    <div id="edit-member-prompt-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Member Prompt</h3>
+                <button class="modal-close" id="edit-member-prompt-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-member-prompt-text">Additional Prompt:</label>
+                    <textarea id="edit-member-prompt-text" rows="5" placeholder="Enter additional prompt for this member..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="edit-member-prompt-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="edit-member-prompt-save">Save</button>
             </div>
         </div>
     </div>

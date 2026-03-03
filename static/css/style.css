@@ -408,7 +408,8 @@ form {
 }
 
 .form-group input[type="text"],
-.form-group select {
+.form-group select,
+.form-group textarea {
     width: 100%;
     padding: 12px;
     background-color: var(--bg-tertiary);
@@ -417,16 +418,24 @@ form {
     color: var(--text-primary);
     font-size: 14px;
     transition: all 0.2s;
+    font-family: inherit;
 }
 
 .form-group input[type="text"]:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
     outline: none;
     border-color: var(--accent-primary);
 }
 
-.form-group input[type="text"]::placeholder {
+.form-group input[type="text"]::placeholder,
+.form-group textarea::placeholder {
     color: var(--text-muted);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
 }
 
 /* Checkbox Group */
@@ -604,4 +613,159 @@ form {
 
 .btn-info:hover {
     background-color: #2563eb;
+}
+
+/* Groups Section */
+.groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.group-item {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s;
+}
+
+.group-item:hover {
+    border-color: var(--accent-primary);
+}
+
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.group-info {
+    flex: 1;
+}
+
+.group-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.group-admin,
+.group-members-count {
+    display: inline-block;
+    margin-right: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.group-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background-color: var(--bg-hover);
+}
+
+.toggle-members {
+    font-size: 14px;
+}
+
+.group-prompt {
+    padding: 12px;
+    background-color: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.group-prompt strong {
+    color: var(--accent-primary);
+}
+
+.group-prompt em {
+    color: var(--text-muted);
+}
+
+.group-members {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.member-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.member-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.member-info {
+    flex: 1;
+}
+
+.member-name {
+    display: block;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.admin-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background-color: var(--accent-success);
+    color: white;
+    font-size: 11px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.member-phone {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.member-prompt {
+    flex: 2;
+    margin: 0 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.member-prompt strong {
+    color: var(--accent-primary);
+}
+
+.member-prompt em {
+    color: var(--text-muted);
+}
+
+.no-data {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 14px;
 }

@@ -47,6 +47,7 @@ class CreateGroupRequest(BaseModel):
     name: str
     admin_id: str
     member_ids: List[str]
+    global_prompt: str = ""
 
 
 class CreateGroupResponse(BaseModel):
@@ -201,16 +202,26 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
         new_group = Group(
             name=request.name,
             telegram_id=telegram_chat_id,
-            admin_id=UUID(request.admin_id)
+            admin_id=UUID(request.admin_id),
+            global_prompt=request.global_prompt
         )
         db.add(new_group)
         await db.flush()
 
-        # Додати учасників до БД
+        # Додати адміна до members з is_admin=True
+        admin_member = Member(
+            userbot_id=UUID(request.admin_id),
+            group_id=new_group.id,
+            is_admin=True
+        )
+        db.add(admin_member)
+
+        # Додати інших учасників до БД з is_admin=False
         for member_id in request.member_ids:
             member = Member(
                 userbot_id=UUID(member_id),
-                group_id=new_group.id
+                group_id=new_group.id,
+                is_admin=False
             )
             db.add(member)
 
@@ -228,6 +239,137 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating group: {str(e)}")
+
+
+@router.get("/groups")
+async def get_groups(db: AsyncSession = Depends(get_db)):
+    """
+    Отримати всі групи з мемберами
+    """
+    try:
+        result = await db.execute(
+            select(Group).order_by(Group.created_at.desc())
+        )
+        groups = result.scalars().all()
+
+        groups_data = []
+        for group in groups:
+            # Отримати мемберів групи
+            members_result = await db.execute(
+                select(Member).where(Member.group_id == group.id)
+            )
+            members = members_result.scalars().all()
+
+            # Отримати дані юзерботів для кожного мембера
+            members_data = []
+            for member in members:
+                userbot_result = await db.execute(
+                    select(Userbot).where(Userbot.id == member.userbot_id)
+                )
+                userbot = userbot_result.scalar_one_or_none()
+
+                if userbot:
+                    members_data.append({
+                        "member_id": str(member.id),
+                        "userbot_id": str(userbot.id),
+                        "userbot_name": userbot.name or userbot.phone_number,
+                        "phone_number": userbot.phone_number,
+                        "is_admin": member.is_admin,
+                        "additional_prompt": member.additional_prompt or ""
+                    })
+
+            # Отримати адміна
+            admin_name = None
+            if group.admin_id:
+                admin_result = await db.execute(
+                    select(Userbot).where(Userbot.id == group.admin_id)
+                )
+                admin = admin_result.scalar_one_or_none()
+                if admin:
+                    admin_name = admin.name or admin.phone_number
+
+            groups_data.append({
+                "id": str(group.id),
+                "name": group.name,
+                "telegram_id": group.telegram_id,
+                "admin_id": str(group.admin_id) if group.admin_id else None,
+                "admin_name": admin_name,
+                "global_prompt": group.global_prompt or "",
+                "group_settings": group.group_settings,
+                "created_at": group.created_at.isoformat(),
+                "members": members_data
+            })
+
+        return {"groups": groups_data}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching groups: {str(e)}")
+
+
+@router.put("/groups/{group_id}/prompt")
+async def update_group_prompt(
+    group_id: str,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Оновити global_prompt групи
+    """
+    try:
+        result = await db.execute(
+            select(Group).where(Group.id == UUID(group_id))
+        )
+        group = result.scalar_one_or_none()
+
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        group.global_prompt = request.get("global_prompt", "")
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Group prompt updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating group prompt: {str(e)}")
+
+
+@router.put("/members/{member_id}/prompt")
+async def update_member_prompt(
+    member_id: str,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Оновити additional_prompt мембера
+    """
+    try:
+        result = await db.execute(
+            select(Member).where(Member.id == UUID(member_id))
+        )
+        member = result.scalar_one_or_none()
+
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        member.additional_prompt = request.get("additional_prompt", "")
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Member prompt updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating member prompt: {str(e)}")
 
 
 @router.get("/contacts/add-all")
