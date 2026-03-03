@@ -1,5 +1,7 @@
 import asyncio
 import random
+import aiohttp
+import io
 from pathlib import Path
 from typing import Dict, Optional, List
 from uuid import UUID
@@ -12,6 +14,7 @@ from sqlalchemy import select, desc
 from database.config import async_session_maker
 from models import Group, Member, ChatHistory, Userbot, MessageHistory
 from app.services.grok_service import grok_service
+from app.services.unsplash_service import unsplash_service
 import os
 from dotenv import load_dotenv
 
@@ -138,8 +141,25 @@ class ConversationService:
         context_parts = [
             "You are participating in a group conversation.",
             "Your PRIMARY GOAL: Keep conversation DIVERSE and INTERESTING.",
-            "Write in the same language as the conversation.",
         ]
+
+        # Language requirement - CRITICAL
+        if style_settings:
+            language = style_settings.get("language", "ukrainian")
+            if language == "ukrainian":
+                context_parts.append("\n🇺🇦 CRITICAL LANGUAGE REQUIREMENT: Write ONLY in UKRAINIAN language!")
+                context_parts.append("- ALL messages must be in Ukrainian (Українська мова)")
+                context_parts.append("- NEVER use Russian words or phrases")
+                context_parts.append("- Use Ukrainian vocabulary: 'дякую' (not 'спасибо'), 'будь ласка' (not 'пожалуйста')")
+                context_parts.append("- If conversation contains Russian, RESPOND IN UKRAINIAN anyway")
+            elif language == "russian":
+                context_parts.append("\n🇷🇺 CRITICAL LANGUAGE REQUIREMENT: Write ONLY in RUSSIAN language!")
+                context_parts.append("- ALL messages must be in Russian (Русский язык)")
+                context_parts.append("- NEVER use Ukrainian words or phrases")
+                context_parts.append("- Use Russian vocabulary: 'спасибо' (not 'дякую'), 'пожалуйста' (not 'будь ласка')")
+                context_parts.append("- If conversation contains Ukrainian, RESPOND IN RUSSIAN anyway")
+        else:
+            context_parts.append("Write in the same language as the conversation.")
 
         # PRIORITY: Answer unanswered questions first
         if unanswered_question:
@@ -255,6 +275,32 @@ class ConversationService:
                 context_parts.append("You MAY use profanity when contextually appropriate (don't force it, but it's allowed)")
             else:
                 context_parts.append("NEVER use profanity or curse words under any circumstances")
+
+            # Youth slang (молодіжний сленг)
+            if style_settings.get("use_youth_slang"):
+                context_parts.append("\n💬 Use YOUTH SLANG naturally in your messages:")
+                context_parts.append("- Modern expressions: 'типу', 'кайф', 'агонь', 'топ', 'хайп', 'рофл', 'кринж'")
+                context_parts.append("- Casual phrases: 'в принципі', 'по факту', 'реально', 'взагалі', 'короче'")
+                context_parts.append("- Examples: 'Це взагалі топ!', 'Типу норм виглядає', 'Агонь, реально кайф'")
+                context_parts.append("Don't overuse - sprinkle naturally, 2-3 slang words per message maximum")
+
+            # Illiterate slang (неграмотний сленг)
+            if style_settings.get("use_illiterate_slang"):
+                context_parts.append("\n📝 Write with ILLITERATE SLANG (simplified/incorrect forms):")
+                context_parts.append("- Use: 'шо' (що), 'чо' (що), 'спс' (спасибі), 'норм' (нормально)")
+                context_parts.append("- Use: 'ваще' (взагалі), 'щас' (зараз), 'канєш' (звичайно), 'ок' (окей)")
+                context_parts.append("- Simplify: 'тож' (тобто), 'чел' (чоловік), 'тіпа' (типу), 'ваапше' (взагалі)")
+                context_parts.append("- Examples: 'Ну норм ваще', 'Да шо ти кажеш', 'Спс, ок зрозумів'")
+                context_parts.append("Write casually and informally, like in quick messenger chat")
+
+            # Intentional typos (навмисні помарки)
+            if style_settings.get("use_typos"):
+                context_parts.append("\n⌨️ Make INTENTIONAL TYPOS (simulate keyboard misses):")
+                context_parts.append("- Miss nearby keys: 'автомоюіль' (автомобіль), 'привить' (привіт), 'нормалтно' (нормально)")
+                context_parts.append("- Swap adjacent letters: 'ялюди' (люди), 'порділіться' (поділіться), 'харокий' (хороший)")
+                context_parts.append("- Hit extra key: 'роботаю' (роботаю), 'пирвіт' (привіт), 'пзорізумів' (зрозумів)")
+                context_parts.append("- Examples: 'Привить, як спарви?', 'В мене стуктв двигугн', 'Нормалтно все'")
+                context_parts.append("Add 1-2 typos per message, keep it readable")
 
             # Photo/Image restrictions - CRITICAL
             context_parts.append("\n🚫 CRITICAL RESTRICTION: NEVER request photos or images!")
@@ -500,6 +546,113 @@ class ConversationService:
             print(f"[ConversationService] Error sending member message: {e}")
             raise
 
+    async def _send_member_photo(
+        self,
+        client: TelegramClient,
+        group: Group,
+        member: Member,
+        photo_url: str,
+        caption: Optional[str] = None
+    ):
+        """
+        Download and send a photo from URL to group
+
+        Args:
+            photo_url: URL of the photo to download and send
+            caption: Optional caption for the photo
+        """
+        try:
+            # Get entity first
+            entity = await client.get_entity(group.telegram_id)
+
+            # Download photo
+            async with aiohttp.ClientSession() as session:
+                async with session.get(photo_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                    if response.status != 200:
+                        print(f"[ConversationService] Failed to download photo: {response.status}")
+                        raise Exception(f"Failed to download photo: {response.status}")
+
+                    photo_bytes = await response.read()
+                    photo_file = io.BytesIO(photo_bytes)
+                    photo_file.name = "photo.jpg"
+
+            # Simulate typing for photos too (shorter duration)
+            typing_duration = 3  # seconds
+            print(f"[ConversationService] Simulating typing for {typing_duration}s before sending photo...")
+
+            await client(SetTypingRequest(
+                peer=entity,
+                action=SendMessageTypingAction()
+            ))
+            await asyncio.sleep(typing_duration)
+
+            # Send photo to Telegram
+            sent_message = await client.send_file(
+                entity=entity,
+                file=photo_file,
+                caption=caption
+            )
+
+            print(f"[ConversationService] Photo sent to '{group.name}'")
+
+            # Save to both chat_history and message_history with retry logic
+            caption_text = caption or "[Photo]"
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    async with async_session_maker() as db:
+                        # Save to chat_history (for conversation tracking)
+                        chat_entry = ChatHistory(
+                            group_id=group.id,
+                            userbot_id=member.userbot_id,
+                            message=caption_text,
+                            telegram_message_id=sent_message.id,
+                            additional_info={
+                                "global_prompt": group.global_prompt or "",
+                                "member_prompt": member.additional_prompt or "",
+                                "auto_generated": True,
+                                "message_type": "photo",
+                                "photo_url": photo_url
+                            }
+                        )
+                        db.add(chat_entry)
+
+                        # Save to message_history (for general message tracking)
+                        message_entry = MessageHistory(
+                            message=caption_text,
+                            group_id=group.id,
+                            userbot_id=member.userbot_id,
+                            additional_info={
+                                "telegram_message_id": sent_message.id,
+                                "auto_generated": True,
+                                "message_type": "photo",
+                                "photo_url": photo_url
+                            }
+                        )
+                        db.add(message_entry)
+
+                        await db.commit()
+                        print(f"[ConversationService] Photo message saved to chat_history and message_history")
+                        break  # Success, exit retry loop
+
+                except Exception as db_error:
+                    error_msg = str(db_error)
+                    if "database is locked" in error_msg.lower() and attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 0.5
+                        print(f"[ConversationService] Database locked on attempt {attempt + 1}/{max_retries}, retrying in {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        print(f"[ConversationService] Failed to save photo message after {attempt + 1} attempts: {db_error}")
+                        if attempt == max_retries - 1:
+                            raise
+
+            # Update last sender
+            self.last_sender[str(group.id)] = member.userbot_id
+
+        except Exception as e:
+            print(f"[ConversationService] Error sending member photo: {e}")
+            raise
+
     async def _conversation_loop(self, group_id: str):
         """Main conversation loop for a group"""
         print(f"[ConversationService] Starting conversation loop for group {group_id}")
@@ -598,14 +751,58 @@ class ConversationService:
                                 print(f"[ConversationService] Session not authorized for {selected_userbot.phone_number}")
                                 continue
 
-                            # Send message (with reply if answering a question)
-                            await self._send_member_message(
-                                client=client,
-                                group=group,
-                                member=selected_member,
-                                message_text=message_text,
-                                reply_to=reply_to
+                            # Check if should send photo instead of text (10% chance if enabled)
+                            send_photos = selected_userbot.style_settings.get("send_photos", False)
+                            should_send_photo = (
+                                send_photos and
+                                unsplash_service.enabled and
+                                random.random() < 0.1 and
+                                not reply_to
                             )
+
+                            if should_send_photo:
+                                # Try to send photo instead of text message
+                                print(f"[ConversationService] Attempting to send photo instead of text...")
+
+                                # Extract keywords from recent conversation
+                                context_text = " ".join([msg.message for msg in recent_messages[-3:]])
+                                keyword = unsplash_service.extract_keywords(context_text)
+                                print(f"[ConversationService] Extracted keyword for photo: {keyword}")
+
+                                # Fetch photo from Unsplash
+                                photo_info = await unsplash_service.get_random_photo(keyword)
+
+                                if photo_info:
+                                    # Send photo with caption
+                                    await self._send_member_photo(
+                                        client=client,
+                                        group=group,
+                                        member=selected_member,
+                                        photo_url=photo_info["url"],
+                                        caption=message_text[:200] if message_text else None  # Optional caption
+                                    )
+
+                                    # Trigger download for Unsplash attribution
+                                    await unsplash_service.trigger_download(photo_info["download_url"])
+                                else:
+                                    # Fallback to text if photo fetch failed
+                                    print(f"[ConversationService] Photo fetch failed, sending text instead")
+                                    await self._send_member_message(
+                                        client=client,
+                                        group=group,
+                                        member=selected_member,
+                                        message_text=message_text,
+                                        reply_to=reply_to
+                                    )
+                            else:
+                                # Send regular text message (with reply if answering a question)
+                                await self._send_member_message(
+                                    client=client,
+                                    group=group,
+                                    member=selected_member,
+                                    message_text=message_text,
+                                    reply_to=reply_to
+                                )
 
                         finally:
                             # Always disconnect client, even if error occurs

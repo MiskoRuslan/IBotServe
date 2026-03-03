@@ -17,7 +17,7 @@ class Userbot(BaseModel):
         JSONB,
         nullable=False,
         default=dict,
-        server_default='{"allow_profanity": false, "use_punctuation": true, "use_uppercase": true, "send_photos": false, "gender": "male", "send_stickers": false, "use_ascii_emoticons": false, "emoji_probability": 0, "message_length": "medium", "use_youth_slang": false, "use_illiterate_slang": false, "use_typos": false}'
+        server_default='{"allow_profanity": false, "use_punctuation": true, "use_uppercase": true, "send_photos": false, "gender": "male", "send_stickers": false, "use_ascii_emoticons": false, "emoji_probability": 0, "message_length": "medium", "use_youth_slang": false, "use_illiterate_slang": false, "use_typos": false, "language": "ukrainian"}'
     )
 
     members: Mapped[list["Member"]] = relationship(

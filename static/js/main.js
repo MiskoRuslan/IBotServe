@@ -807,6 +807,7 @@ function editStyleSettings(userbotId, currentSettings) {
     document.getElementById('style-use-uppercase').checked = currentSettings.use_uppercase !== false;
     document.getElementById('style-send-photos').checked = currentSettings.send_photos || false;
     document.getElementById('style-gender').value = currentSettings.gender || 'male';
+    document.getElementById('style-language').value = currentSettings.language || 'ukrainian';
     document.getElementById('style-send-stickers').checked = currentSettings.send_stickers || false;
     document.getElementById('style-use-ascii-emoticons').checked = currentSettings.use_ascii_emoticons || false;
 
@@ -839,9 +840,13 @@ async function saveStyleSettings() {
         use_uppercase: document.getElementById('style-use-uppercase').checked,
         send_photos: document.getElementById('style-send-photos').checked,
         gender: document.getElementById('style-gender').value,
+        language: document.getElementById('style-language').value,
         send_stickers: document.getElementById('style-send-stickers').checked,
         use_ascii_emoticons: document.getElementById('style-use-ascii-emoticons').checked,
         emoji_probability: parseInt(document.getElementById('style-emoji-probability').value) || 0,
+        use_youth_slang: document.getElementById('style-use-youth-slang').checked,
+        use_illiterate_slang: document.getElementById('style-use-illiterate-slang').checked,
+        use_typos: document.getElementById('style-use-typos').checked,
         message_length: document.getElementById('style-message-length').value
     };
     
