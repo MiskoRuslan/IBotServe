@@ -21,6 +21,7 @@ from database.managers.userbots_manager import UserBotsManager
 from database.managers.groups_manager import GroupsManager
 from database.managers.members_manager import MembersManager
 from database.managers.contacts_manager import ContactsManager
+from database.managers.stickers_manager import StickersManager
 
 __all__ = [
     "BaseManager",
@@ -28,4 +29,5 @@ __all__ = [
     "GroupsManager",
     "MembersManager",
     "ContactsManager",
+    "StickersManager",
 ]

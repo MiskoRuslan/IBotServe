@@ -46,6 +46,17 @@ const editMemberPromptText = document.getElementById('edit-member-prompt-text');
 let availableUserbots = [];
 let currentEditingGroupId = null;
 let currentEditingMemberId = null;
+let currentManagingStickersUserbotId = null;
+
+// Stickers modal elements
+const manageStickersModal = document.getElementById('manage-stickers-modal');
+const manageStickersClose = document.getElementById('manage-stickers-close');
+const closeStickersBtn = document.getElementById('close-stickers-btn');
+const stickersUserbotName = document.getElementById('stickers-userbot-name');
+const stickersList = document.getElementById('stickers-list');
+const stickerFileIdInput = document.getElementById('sticker-file-id');
+const stickerEmotionSelect = document.getElementById('sticker-emotion');
+const addStickerBtn = document.getElementById('add-sticker-btn');
 
 function showNotification(message, type = 'info') {
     notificationEl.textContent = message;
@@ -87,6 +98,11 @@ async function loadUserbots() {
                             onclick="editStyleSettingsFromButton(this)"
                             title="Edit style settings">
                         ⚙️ Style Settings
+                    </button>
+                    <button class="btn btn-sm btn-info"
+                            onclick="openManageStickers('${bot.id}', '${escapeHtml(bot.name || bot.phone_number || 'Unknown')}')"
+                            title="Manage stickers">
+                        🎭 Stickers
                     </button>
                 </div>
             </div>
@@ -888,5 +904,173 @@ document.getElementById('style-emoji-probability').addEventListener('input', (e)
 editStyleModal.addEventListener('click', (e) => {
     if (e.target === editStyleModal) {
         closeStyleModal();
+    }
+});
+
+// ==================== STICKERS MANAGEMENT ====================
+
+async function openManageStickers(userbotId, userbotName) {
+    currentManagingStickersUserbotId = userbotId;
+    stickersUserbotName.textContent = userbotName;
+
+    // Clear inputs
+    stickerFileIdInput.value = '';
+    stickerEmotionSelect.value = 'laughter';
+
+    // Show modal
+    manageStickersModal.classList.remove('hidden');
+
+    // Load stickers
+    await loadStickers(userbotId);
+}
+
+function closeManageStickers() {
+    manageStickersModal.classList.add('hidden');
+    currentManagingStickersUserbotId = null;
+}
+
+async function loadStickers(userbotId) {
+    try {
+        stickersList.innerHTML = '<div class="loading">Loading stickers...</div>';
+
+        const response = await fetch(`${API_BASE}/stickers/${userbotId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || 'Failed to load stickers');
+        }
+
+        if (data.stickers.length === 0) {
+            stickersList.innerHTML = '<div class="no-data">No stickers added yet</div>';
+            return;
+        }
+
+        // Group by emotion
+        const groupedStickers = {};
+        data.stickers.forEach(sticker => {
+            if (!groupedStickers[sticker.emotion]) {
+                groupedStickers[sticker.emotion] = [];
+            }
+            groupedStickers[sticker.emotion].push(sticker);
+        });
+
+        // Render grouped stickers
+        stickersList.innerHTML = Object.entries(groupedStickers).map(([emotion, stickers]) => `
+            <div class="sticker-group">
+                <div class="sticker-group-header">${getEmotionEmoji(emotion)} ${emotion} (${stickers.length})</div>
+                <div class="sticker-items">
+                    ${stickers.map(sticker => `
+                        <div class="sticker-item">
+                            <div class="sticker-info">
+                                <code class="sticker-file-id">${sticker.file_id}</code>
+                            </div>
+                            <button class="btn-icon-small btn-danger"
+                                    onclick="deleteSticker('${sticker.id}')"
+                                    title="Delete sticker">
+                                🗑️
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading stickers:', error);
+        stickersList.innerHTML = '<div class="error">Error loading stickers</div>';
+        showNotification('Failed to load stickers', 'error');
+    }
+}
+
+function getEmotionEmoji(emotion) {
+    const emojis = {
+        'laughter': '😂',
+        'sad': '😢',
+        'angry': '😠',
+        'love': '❤️',
+        'surprised': '😮',
+        'confused': '😕',
+        'happy': '😊',
+        'thinking': '🤔',
+        'crying': '😭',
+        'cool': '😎'
+    };
+    return emojis[emotion] || '🎭';
+}
+
+async function addSticker() {
+    const fileId = stickerFileIdInput.value.trim();
+    const emotion = stickerEmotionSelect.value;
+
+    if (!fileId) {
+        showNotification('Please enter a file_id', 'error');
+        return;
+    }
+
+    if (!currentManagingStickersUserbotId) {
+        showNotification('No userbot selected', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/stickers`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userbot_id: currentManagingStickersUserbotId,
+                file_id: fileId,
+                emotion: emotion
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Sticker added successfully', 'success');
+            stickerFileIdInput.value = '';
+            await loadStickers(currentManagingStickersUserbotId);
+        } else {
+            showNotification(data.detail || 'Failed to add sticker', 'error');
+        }
+    } catch (error) {
+        console.error('Error adding sticker:', error);
+        showNotification('Failed to add sticker', 'error');
+    }
+}
+
+async function deleteSticker(stickerId) {
+    if (!confirm('Are you sure you want to delete this sticker?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/stickers/${stickerId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Sticker deleted successfully', 'success');
+            await loadStickers(currentManagingStickersUserbotId);
+        } else {
+            showNotification(data.detail || 'Failed to delete sticker', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting sticker:', error);
+        showNotification('Failed to delete sticker', 'error');
+    }
+}
+
+// Event listeners for stickers modal
+manageStickersClose.addEventListener('click', closeManageStickers);
+closeStickersBtn.addEventListener('click', closeManageStickers);
+addStickerBtn.addEventListener('click', addSticker);
+
+manageStickersModal.addEventListener('click', (e) => {
+    if (e.target === manageStickersModal) {
+        closeManageStickers();
     }
 });

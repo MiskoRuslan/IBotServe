@@ -257,6 +257,56 @@
         </div>
     </div>
 
+    <!-- Manage Stickers Modal -->
+    <div id="manage-stickers-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Stickers - <span id="stickers-userbot-name"></span></h3>
+                <button class="modal-close" id="manage-stickers-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="stickers-section">
+                    <h4>Add New Sticker</h4>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label for="sticker-file-id">Telegram File ID:</label>
+                            <input type="text" id="sticker-file-id" placeholder="Enter sticker file_id">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="sticker-emotion">Emotion:</label>
+                            <select id="sticker-emotion">
+                                <option value="laughter">😂 Laughter</option>
+                                <option value="sad">😢 Sad</option>
+                                <option value="angry">😠 Angry</option>
+                                <option value="love">❤️ Love</option>
+                                <option value="surprised">😮 Surprised</option>
+                                <option value="confused">😕 Confused</option>
+                                <option value="happy">😊 Happy</option>
+                                <option value="thinking">🤔 Thinking</option>
+                                <option value="crying">😭 Crying</option>
+                                <option value="cool">😎 Cool</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 0; align-self: flex-end;">
+                            <button class="btn btn-success" id="add-sticker-btn">Add</button>
+                        </div>
+                    </div>
+                    <small>To get file_id: forward a sticker to @userinfobot in Telegram</small>
+                </div>
+
+                <div class="stickers-section">
+                    <h4>Current Stickers</h4>
+                    <div id="stickers-list" class="stickers-list">
+                        <div class="loading">Loading stickers...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="close-stickers-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Userbot Style Settings Modal -->
     <div id="edit-style-modal" class="modal hidden">
         <div class="modal-content">
@@ -312,8 +362,8 @@
 
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="style-send-stickers" disabled>
-                            Send stickers (not implemented yet)
+                            <input type="checkbox" id="style-send-stickers">
+                            Send stickers (15% chance, random from userbot's collection)
                         </label>
                     </div>
 

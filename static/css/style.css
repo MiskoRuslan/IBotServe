@@ -906,3 +906,92 @@ form {
 .settings-grid select {
     margin-top: 4px;
 }
+
+/* Stickers Management */
+.stickers-section {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--background);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.stickers-section h4 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 16px;
+}
+
+.stickers-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.sticker-group {
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.sticker-group-header {
+    background: var(--primary);
+    color: white;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.sticker-items {
+    padding: 8px;
+    background: var(--background);
+}
+
+.sticker-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    margin-bottom: 4px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.sticker-item:last-child {
+    margin-bottom: 0;
+}
+
+.sticker-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sticker-file-id {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: var(--background);
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.no-data {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-secondary);
+    font-style: italic;
+}

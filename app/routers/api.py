@@ -10,6 +10,7 @@ from app.services.contact_service import ContactService
 from app.services.message_listener import message_listener
 from app.services.conversation_service import conversation_service
 from database.managers.contacts_manager import ContactsManager
+from database.managers.stickers_manager import StickersManager
 from typing import List
 from pydantic import BaseModel
 from uuid import UUID
@@ -20,6 +21,7 @@ session_service = SessionService()
 group_service = GroupService()
 contact_service = ContactService()
 contacts_manager = ContactsManager()
+stickers_manager = StickersManager()
 
 
 class UserbotResponse(BaseModel):
@@ -60,6 +62,23 @@ class CreateGroupResponse(BaseModel):
     telegram_id: int
     name: str
     message: str
+
+
+class CreateStickerRequest(BaseModel):
+    userbot_id: str
+    file_id: str
+    emotion: str
+
+
+class StickerResponse(BaseModel):
+    id: str
+    userbot_id: str
+    file_id: str
+    emotion: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
 
 
 @router.get("/userbots")
@@ -654,3 +673,118 @@ async def update_group_settings(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating group settings: {str(e)}")
+
+
+@router.get("/stickers/{userbot_id}")
+async def get_userbot_stickers(
+    userbot_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all stickers for a userbot
+    """
+    try:
+        # Check if userbot exists
+        result = await db.execute(
+            select(Userbot).where(Userbot.id == UUID(userbot_id))
+        )
+        userbot = result.scalar_one_or_none()
+
+        if not userbot:
+            raise HTTPException(status_code=404, detail="Userbot not found")
+
+        # Get stickers
+        stickers = await stickers_manager.get_stickers_for_userbot(db, UUID(userbot_id))
+
+        return {
+            "stickers": [
+                {
+                    "id": str(sticker.id),
+                    "userbot_id": str(sticker.userbot_id),
+                    "file_id": sticker.file_id,
+                    "emotion": sticker.emotion,
+                    "created_at": sticker.created_at.isoformat()
+                }
+                for sticker in stickers
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching stickers: {str(e)}")
+
+
+@router.post("/stickers")
+async def create_sticker(
+    request: CreateStickerRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new sticker for a userbot
+    """
+    try:
+        # Check if userbot exists
+        result = await db.execute(
+            select(Userbot).where(Userbot.id == UUID(request.userbot_id))
+        )
+        userbot = result.scalar_one_or_none()
+
+        if not userbot:
+            raise HTTPException(status_code=404, detail="Userbot not found")
+
+        # Create sticker
+        sticker = await stickers_manager.create_sticker(
+            db,
+            userbot_id=UUID(request.userbot_id),
+            file_id=request.file_id,
+            emotion=request.emotion
+        )
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Sticker added successfully",
+            "sticker": {
+                "id": str(sticker.id),
+                "userbot_id": str(sticker.userbot_id),
+                "file_id": sticker.file_id,
+                "emotion": sticker.emotion,
+                "created_at": sticker.created_at.isoformat()
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating sticker: {str(e)}")
+
+
+@router.delete("/stickers/{sticker_id}")
+async def delete_sticker(
+    sticker_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a sticker
+    """
+    try:
+        deleted = await stickers_manager.delete_sticker(db, UUID(sticker_id))
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Sticker not found")
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Sticker deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting sticker: {str(e)}")

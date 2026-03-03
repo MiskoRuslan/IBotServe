@@ -15,6 +15,7 @@ from database.config import async_session_maker
 from models import Group, Member, ChatHistory, Userbot, MessageHistory
 from app.services.grok_service import grok_service
 from app.services.unsplash_service import unsplash_service
+from database.managers.stickers_manager import StickersManager
 import os
 from dotenv import load_dotenv
 
@@ -37,6 +38,9 @@ class ConversationService:
 
         # Track last message sender per group: group_id -> userbot_id
         self.last_sender: Dict[str, UUID] = {}
+
+        # Stickers manager
+        self.stickers_manager = StickersManager()
 
         if not self.api_id or not self.api_hash:
             raise ValueError("API_ID and API_HASH must be set in .env file")
@@ -653,6 +657,103 @@ class ConversationService:
             print(f"[ConversationService] Error sending member photo: {e}")
             raise
 
+    async def _send_member_sticker(
+        self,
+        client: TelegramClient,
+        group: Group,
+        member: Member,
+        sticker_file_id: str,
+        emotion: str
+    ):
+        """
+        Send a sticker to group using Telegram file_id
+
+        Args:
+            sticker_file_id: Telegram file_id of the sticker
+            emotion: Emotion tag of the sticker
+        """
+        try:
+            # Get entity first
+            entity = await client.get_entity(group.telegram_id)
+
+            # Simulate typing before sending sticker (shorter duration)
+            typing_duration = 2  # seconds
+            print(f"[ConversationService] Simulating typing for {typing_duration}s before sending sticker...")
+
+            await client(SetTypingRequest(
+                peer=entity,
+                action=SendMessageTypingAction()
+            ))
+            await asyncio.sleep(typing_duration)
+
+            # Send sticker using file_id
+            sent_message = await client.send_file(
+                entity=entity,
+                file=sticker_file_id
+            )
+
+            print(f"[ConversationService] Sticker ({emotion}) sent to '{group.name}'")
+
+            # Save to both chat_history and message_history with retry logic
+            sticker_text = f"[Sticker: {emotion}]"
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    async with async_session_maker() as db:
+                        # Save to chat_history (for conversation tracking)
+                        chat_entry = ChatHistory(
+                            group_id=group.id,
+                            userbot_id=member.userbot_id,
+                            message=sticker_text,
+                            telegram_message_id=sent_message.id,
+                            additional_info={
+                                "global_prompt": group.global_prompt or "",
+                                "member_prompt": member.additional_prompt or "",
+                                "auto_generated": True,
+                                "message_type": "sticker",
+                                "emotion": emotion,
+                                "file_id": sticker_file_id
+                            }
+                        )
+                        db.add(chat_entry)
+
+                        # Save to message_history (for general message tracking)
+                        message_entry = MessageHistory(
+                            message=sticker_text,
+                            group_id=group.id,
+                            userbot_id=member.userbot_id,
+                            additional_info={
+                                "telegram_message_id": sent_message.id,
+                                "auto_generated": True,
+                                "message_type": "sticker",
+                                "emotion": emotion,
+                                "file_id": sticker_file_id
+                            }
+                        )
+                        db.add(message_entry)
+
+                        await db.commit()
+                        print(f"[ConversationService] Sticker message saved to chat_history and message_history")
+                        break  # Success, exit retry loop
+
+                except Exception as db_error:
+                    error_msg = str(db_error)
+                    if "database is locked" in error_msg.lower() and attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 0.5
+                        print(f"[ConversationService] Database locked on attempt {attempt + 1}/{max_retries}, retrying in {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        print(f"[ConversationService] Failed to save sticker message after {attempt + 1} attempts: {db_error}")
+                        if attempt == max_retries - 1:
+                            raise
+
+            # Update last sender
+            self.last_sender[str(group.id)] = member.userbot_id
+
+        except Exception as e:
+            print(f"[ConversationService] Error sending member sticker: {e}")
+            raise
+
     async def _conversation_loop(self, group_id: str):
         """Main conversation loop for a group"""
         print(f"[ConversationService] Starting conversation loop for group {group_id}")
@@ -751,42 +852,41 @@ class ConversationService:
                                 print(f"[ConversationService] Session not authorized for {selected_userbot.phone_number}")
                                 continue
 
-                            # Check if should send photo instead of text (10% chance if enabled)
-                            send_photos = selected_userbot.style_settings.get("send_photos", False)
-                            should_send_photo = (
-                                send_photos and
-                                unsplash_service.enabled and
-                                random.random() < 0.1 and
-                                not reply_to
+                            # Check if should send sticker instead of text (15% chance if enabled)
+                            send_stickers = selected_userbot.style_settings.get("send_stickers", False)
+                            should_send_sticker = (
+                                send_stickers and
+                                random.random() < 0.15 and
+                                not reply_to  # Don't send stickers when replying to questions
                             )
 
-                            if should_send_photo:
-                                # Try to send photo instead of text message
-                                print(f"[ConversationService] Attempting to send photo instead of text...")
+                            if should_send_sticker:
+                                # Try to get available stickers for this userbot
+                                print(f"[ConversationService] Attempting to send sticker instead of text...")
 
-                                # Extract keywords from recent conversation
-                                context_text = " ".join([msg.message for msg in recent_messages[-3:]])
-                                keyword = unsplash_service.extract_keywords(context_text)
-                                print(f"[ConversationService] Extracted keyword for photo: {keyword}")
+                                # Get stickers from database
+                                async with async_session_maker() as sticker_db:
+                                    available_stickers = await self.stickers_manager.get_stickers_for_userbot(
+                                        sticker_db,
+                                        selected_member.userbot_id
+                                    )
 
-                                # Fetch photo from Unsplash
-                                photo_info = await unsplash_service.get_random_photo(keyword)
+                                if available_stickers:
+                                    # Choose random sticker
+                                    random_sticker = random.choice(available_stickers)
+                                    print(f"[ConversationService] Sending sticker with emotion: {random_sticker.emotion}")
 
-                                if photo_info:
-                                    # Send photo with caption
-                                    await self._send_member_photo(
+                                    # Send sticker
+                                    await self._send_member_sticker(
                                         client=client,
                                         group=group,
                                         member=selected_member,
-                                        photo_url=photo_info["url"],
-                                        caption=message_text[:200] if message_text else None  # Optional caption
+                                        sticker_file_id=random_sticker.file_id,
+                                        emotion=random_sticker.emotion
                                     )
-
-                                    # Trigger download for Unsplash attribution
-                                    await unsplash_service.trigger_download(photo_info["download_url"])
                                 else:
-                                    # Fallback to text if photo fetch failed
-                                    print(f"[ConversationService] Photo fetch failed, sending text instead")
+                                    # No stickers available, fallback to text
+                                    print(f"[ConversationService] No stickers available, sending text instead")
                                     await self._send_member_message(
                                         client=client,
                                         group=group,
@@ -795,8 +895,52 @@ class ConversationService:
                                         reply_to=reply_to
                                     )
                             else:
-                                # Send regular text message (with reply if answering a question)
-                                await self._send_member_message(
+                                # Check if should send photo instead of text (10% chance if enabled)
+                                send_photos = selected_userbot.style_settings.get("send_photos", False)
+                                should_send_photo = (
+                                    send_photos and
+                                    unsplash_service.enabled and
+                                    random.random() < 0.1 and
+                                    not reply_to
+                                )
+
+                                if should_send_photo:
+                                    # Try to send photo instead of text message
+                                    print(f"[ConversationService] Attempting to send photo instead of text...")
+
+                                    # Extract keywords from recent conversation
+                                    context_text = " ".join([msg.message for msg in recent_messages[-3:]])
+                                    keyword = unsplash_service.extract_keywords(context_text)
+                                    print(f"[ConversationService] Extracted keyword for photo: {keyword}")
+
+                                    # Fetch photo from Unsplash
+                                    photo_info = await unsplash_service.get_random_photo(keyword)
+
+                                    if photo_info:
+                                        # Send photo with caption
+                                        await self._send_member_photo(
+                                            client=client,
+                                            group=group,
+                                            member=selected_member,
+                                            photo_url=photo_info["url"],
+                                            caption=message_text[:200] if message_text else None  # Optional caption
+                                        )
+
+                                        # Trigger download for Unsplash attribution
+                                        await unsplash_service.trigger_download(photo_info["download_url"])
+                                    else:
+                                        # Fallback to text if photo fetch failed
+                                        print(f"[ConversationService] Photo fetch failed, sending text instead")
+                                        await self._send_member_message(
+                                            client=client,
+                                            group=group,
+                                            member=selected_member,
+                                            message_text=message_text,
+                                            reply_to=reply_to
+                                        )
+                                else:
+                                    # Send regular text message (with reply if answering a question)
+                                    await self._send_member_message(
                                     client=client,
                                     group=group,
                                     member=selected_member,
