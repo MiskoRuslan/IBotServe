@@ -7,7 +7,6 @@ from database.managers.base_manager import BaseManager
 
 
 class ContactsManager(BaseManager[Contact]):
-    """Manager for contacts operations"""
 
     def __init__(self):
         super().__init__(Contact)
@@ -18,17 +17,7 @@ class ContactsManager(BaseManager[Contact]):
         userbot_id: UUID,
         contact_userbot_id: UUID
     ) -> bool:
-        """
-        Check if contact already exists
 
-        Args:
-            db: Async database session
-            userbot_id: Owner userbot ID
-            contact_userbot_id: Contact userbot ID
-
-        Returns:
-            True if contact exists, False otherwise
-        """
         result = await db.execute(
             select(Contact).where(
                 and_(
@@ -44,16 +33,7 @@ class ContactsManager(BaseManager[Contact]):
         db: AsyncSession,
         userbot_id: UUID
     ) -> List[Contact]:
-        """
-        Get all contacts for a specific userbot
 
-        Args:
-            db: Async database session
-            userbot_id: Userbot ID
-
-        Returns:
-            List of contacts
-        """
         result = await db.execute(
             select(Contact)
             .where(Contact.userbot_id == userbot_id)
@@ -67,17 +47,7 @@ class ContactsManager(BaseManager[Contact]):
         userbot_id: UUID,
         potential_contact_ids: List[UUID]
     ) -> List[UUID]:
-        """
-        Get list of userbot IDs that are not yet in contacts
 
-        Args:
-            db: Async database session
-            userbot_id: Owner userbot ID
-            potential_contact_ids: List of potential contact IDs
-
-        Returns:
-            List of userbot IDs not in contacts
-        """
         result = await db.execute(
             select(Contact.contact_userbot_id)
             .where(
@@ -97,17 +67,7 @@ class ContactsManager(BaseManager[Contact]):
         userbot_id: UUID,
         contact_ids: List[UUID]
     ) -> List[Contact]:
-        """
-        Bulk create contacts for a userbot
 
-        Args:
-            db: Async database session
-            userbot_id: Owner userbot ID
-            contact_ids: List of contact userbot IDs
-
-        Returns:
-            List of created contacts
-        """
         contacts = []
         for contact_id in contact_ids:
             if contact_id == userbot_id:

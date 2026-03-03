@@ -10,7 +10,6 @@ from database.managers.base_manager import BaseManager
 
 
 class MembersManager(BaseManager[Member]):
-    """Менеджер для роботи з учасниками груп"""
 
     def __init__(self):
         super().__init__(Member)
@@ -21,17 +20,6 @@ class MembersManager(BaseManager[Member]):
         userbot_id: UUID,
         group_id: UUID
     ) -> Optional[Member]:
-        """
-        Знайти запис про членство в групі
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-            group_id: UUID групи
-
-        Returns:
-            Об'єкт Member або None
-        """
         result = await db.execute(
             select(self.model).where(
                 and_(
@@ -49,18 +37,6 @@ class MembersManager(BaseManager[Member]):
         skip: int = 0,
         limit: int = 100
     ) -> List[Member]:
-        """
-        Отримати всіх учасників конкретної групи
-
-        Args:
-            db: Async database session
-            group_id: UUID групи
-            skip: Скільки записів пропустити
-            limit: Максимальна кількість записів
-
-        Returns:
-            Список об'єктів Member
-        """
         result = await db.execute(
             select(self.model)
             .where(self.model.group_id == group_id)
@@ -78,18 +54,6 @@ class MembersManager(BaseManager[Member]):
         skip: int = 0,
         limit: int = 100
     ) -> List[Member]:
-        """
-        Отримати всі групи в яких є конкретний юзербот
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-            skip: Скільки записів пропустити
-            limit: Максимальна кількість записів
-
-        Returns:
-            Список об'єктів Member з завантаженими group
-        """
         result = await db.execute(
             select(self.model)
             .where(self.model.userbot_id == userbot_id)
@@ -106,18 +70,6 @@ class MembersManager(BaseManager[Member]):
         userbot_id: UUID,
         group_id: UUID
     ) -> Member:
-        """
-        Додати учасника до групи
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-            group_id: UUID групи
-
-        Returns:
-            Створений об'єкт Member
-        """
-        # Перевірити чи не існує вже
         existing = await self.get_by_userbot_and_group(db, userbot_id, group_id)
         if existing:
             return existing
@@ -134,17 +86,6 @@ class MembersManager(BaseManager[Member]):
         userbot_id: UUID,
         group_id: UUID
     ) -> bool:
-        """
-        Видалити учасника з групи
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-            group_id: UUID групи
-
-        Returns:
-            True якщо видалено, False якщо не знайдено
-        """
         member = await self.get_by_userbot_and_group(db, userbot_id, group_id)
         if not member:
             return False
@@ -157,20 +98,8 @@ class MembersManager(BaseManager[Member]):
         group_id: UUID,
         userbot_ids: List[UUID]
     ) -> List[Member]:
-        """
-        Масово додати учасників до групи
-
-        Args:
-            db: Async database session
-            group_id: UUID групи
-            userbot_ids: Список UUID юзерботів
-
-        Returns:
-            Список створених об'єктів Member
-        """
         members = []
         for userbot_id in userbot_ids:
-            # Перевірити чи не існує
             existing = await self.get_by_userbot_and_group(db, userbot_id, group_id)
             if not existing:
                 member = self.model(
@@ -194,16 +123,6 @@ class MembersManager(BaseManager[Member]):
         db: AsyncSession,
         group_id: UUID
     ) -> int:
-        """
-        Підрахувати кількість учасників в групі
-
-        Args:
-            db: Async database session
-            group_id: UUID групи
-
-        Returns:
-            Кількість учасників
-        """
         result = await db.execute(
             select(func.count(self.model.id))
             .where(self.model.group_id == group_id)
@@ -215,16 +134,6 @@ class MembersManager(BaseManager[Member]):
         db: AsyncSession,
         userbot_id: UUID
     ) -> int:
-        """
-        Підрахувати кількість груп в яких є юзербот
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-
-        Returns:
-            Кількість груп
-        """
         result = await db.execute(
             select(func.count(self.model.id))
             .where(self.model.userbot_id == userbot_id)
@@ -237,17 +146,6 @@ class MembersManager(BaseManager[Member]):
         userbot_id: UUID,
         group_id: UUID
     ) -> bool:
-        """
-        Перевірити чи є юзербот учасником групи
-
-        Args:
-            db: Async database session
-            userbot_id: UUID юзербота
-            group_id: UUID групи
-
-        Returns:
-            True якщо є учасником, False якщо ні
-        """
         member = await self.get_by_userbot_and_group(db, userbot_id, group_id)
         return member is not None
 
@@ -256,16 +154,6 @@ class MembersManager(BaseManager[Member]):
         db: AsyncSession,
         group_id: UUID
     ) -> List[Userbot]:
-        """
-        Отримати список юзерботів в групі
-
-        Args:
-            db: Async database session
-            group_id: UUID групи
-
-        Returns:
-            Список об'єктів Userbot
-        """
         result = await db.execute(
             select(Userbot)
             .join(Member, Member.userbot_id == Userbot.id)

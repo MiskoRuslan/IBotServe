@@ -12,7 +12,6 @@ class Userbot(BaseModel):
     username: Mapped[str | None] = mapped_column(String, nullable=True)
     trusted_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
-    # Style settings for message generation
     style_settings: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,

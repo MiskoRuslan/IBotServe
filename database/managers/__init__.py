@@ -28,5 +28,4 @@ __all__ = [
     "GroupsManager",
     "MembersManager",
     "ContactsManager",
-    "StickersManager",
 ]

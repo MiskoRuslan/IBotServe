@@ -7,7 +7,6 @@ load_dotenv()
 
 
 class GrokService:
-    """Service for generating human-like messages using Grok API"""
 
     def __init__(self):
         self.api_key = os.getenv('GROK_API_KEY')
@@ -16,8 +15,7 @@ class GrokService:
         if not self.api_key or not self.api_url:
             raise ValueError("GROK_API_KEY and GROK_API_URL must be set in .env file")
 
-        # Available models: grok-3, grok-3-mini, grok-4-0709, grok-4-1-fast-non-reasoning, etc.
-        self.model = "grok-4-1-fast-non-reasoning"  # Fast model without reasoning for quick responses
+        self.model = "grok-4-1-fast-non-reasoning"
 
     async def generate_conversation_starter(
         self,
@@ -26,20 +24,6 @@ class GrokService:
         member_prompt: Optional[str] = None,
         custom_system_prompt: Optional[str] = None
     ) -> str:
-        """
-        Generate a natural human-like conversation starter based on trigger message.
-
-        Args:
-            trigger_message: Original message from trusted user
-            global_prompt: Group's global prompt (context/rules)
-            member_prompt: Member's additional prompt (personality/style)
-            custom_system_prompt: Full custom system prompt (overrides default)
-
-        Returns:
-            Generated natural message
-        """
-
-        # Use custom system prompt if provided, otherwise build default
         if custom_system_prompt:
             system_prompt = custom_system_prompt
         else:
@@ -50,7 +34,7 @@ class GrokService:
                 "The message should be simple, conversational, and look completely natural.",
                 "DO NOT use formal language, overly complex sentences, or AI-like patterns.",
                 "Examples of good messages:",
-                "- 'Как зараз справи з транзитом нафти в Америці?'",
+                "- 'Як зараз справи з транзитом нафти в Америці?'",
                 "- 'Порадьте хороший корм для мого спаніеля'",
                 "- 'Хто знає де купити якісні шини для джипа?'",
                 "- 'Цікаво, чи варто зараз інвестувати в біткоїн?'",
@@ -64,7 +48,6 @@ class GrokService:
 
             system_prompt = "\n".join(system_parts)
 
-        # Build user prompt
         user_prompt = f"""Based on this topic/instruction: "{trigger_message}"
 
 Generate ONE simple, natural question or statement that a real person would write in a chat.
@@ -72,7 +55,6 @@ Keep it casual and conversational. Write in the same language as the topic.
 DO NOT add explanations, just return the message itself."""
 
         try:
-            # Call Grok API (OpenAI-compatible format)
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
@@ -106,10 +88,8 @@ DO NOT add explanations, just return the message itself."""
 
                     data = await response.json()
 
-            # Extract generated text
             generated_text = data['choices'][0]['message']['content'].strip()
 
-            # Remove quotes if present
             if generated_text.startswith('"') and generated_text.endswith('"'):
                 generated_text = generated_text[1:-1]
             if generated_text.startswith("'") and generated_text.endswith("'"):
@@ -121,6 +101,4 @@ DO NOT add explanations, just return the message itself."""
             print(f"[GrokService] Error generating message: {e}")
             raise
 
-
-# Global instance
 grok_service = GrokService()

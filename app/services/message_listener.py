@@ -14,7 +14,6 @@ from app.services.grok_service import grok_service
 
 load_dotenv()
 
-# Import will be done lazily to avoid circular import
 conversation_service = None
 
 
@@ -27,7 +26,6 @@ def get_conversation_service():
 
 
 class MessageListenerService:
-    """Service for listening to messages from trusted users"""
 
     def __init__(self, sessions_dir: str = "sessions"):
         self.sessions_dir = Path(sessions_dir)
@@ -40,7 +38,6 @@ class MessageListenerService:
             raise ValueError("API_ID and API_HASH must be set in .env file")
 
     def _find_session_by_phone(self, phone: str) -> Optional[Path]:
-        """Find session file by phone number"""
         phone_clean = phone.lstrip('+')
         for variant in [f'+{phone_clean}', phone_clean]:
             p = self.sessions_dir / f"{variant}.session"
@@ -55,7 +52,6 @@ class MessageListenerService:
         group_id: Optional[UUID] = None,
         additional_info: Optional[dict] = None
     ) -> Optional[UUID]:
-        """Save message to database and return message ID"""
         try:
             async with async_session_maker() as db:
                 message = MessageHistory(
@@ -80,15 +76,8 @@ class MessageListenerService:
         trigger_message_id: UUID,
         userbot_id: UUID
     ):
-        """
-        Process trigger message from trusted user:
-        - Find all groups where userbot is admin
-        - Generate and send conversation starter to each group
-        - Save to chat_history
-        """
         try:
             async with async_session_maker() as db:
-                # Find all groups where this userbot is admin
                 result = await db.execute(
                     select(Member, Group)
                     .join(Group, Member.group_id == Group.id)
@@ -107,13 +96,11 @@ class MessageListenerService:
 
                 for member, group in admin_memberships:
                     try:
-                        # Get prompts
                         global_prompt = group.global_prompt or ""
                         member_prompt = member.additional_prompt or ""
 
                         print(f"[MessageListener] Generating message for group '{group.name}'...")
 
-                        # Generate natural message using Grok
                         generated_message = await grok_service.generate_conversation_starter(
                             trigger_message=trigger_message_text,
                             global_prompt=global_prompt,
@@ -122,22 +109,18 @@ class MessageListenerService:
 
                         print(f"[MessageListener] Generated: {generated_message}")
 
-                        # Send message to Telegram group
                         print(f"[MessageListener] Attempting to send to Telegram group ID: {group.telegram_id}")
 
                         try:
-                            # Get entity to verify access
                             entity = await client.get_entity(group.telegram_id)
                             print(f"[MessageListener] Entity found: {entity.title} (ID: {entity.id})")
 
-                            # Check if we're a participant
                             try:
                                 participants = await client.get_participants(entity, limit=1)
                                 print(f"[MessageListener] We have access to group participants")
                             except Exception as e:
                                 print(f"[MessageListener] Warning: Cannot access participants: {e}")
 
-                            # Send message
                             sent_message = await client.send_message(
                                 entity=entity,
                                 message=generated_message
@@ -156,7 +139,6 @@ class MessageListenerService:
                             print(f"[MessageListener]   - Group: '{group.name}' (ID: {group.telegram_id})")
                             raise
 
-                        # Save to chat_history
                         chat_history_entry = ChatHistory(
                             group_id=group.id,
                             userbot_id=userbot_id,
@@ -171,7 +153,6 @@ class MessageListenerService:
                         )
                         db.add(chat_history_entry)
 
-                        # Save group info before commit (to avoid detached instance issues)
                         group_id_str = str(group.id)
                         group_name = group.name
                         is_active = group.is_active
@@ -181,7 +162,6 @@ class MessageListenerService:
                         print(f"[MessageListener] Saved to chat_history for group '{group_name}'")
                         print(f"[MessageListener] Group active status: {is_active}")
 
-                        # Start/restart conversation if group is active
                         if is_active:
                             print(f"[MessageListener] Starting conversation for group '{group_name}'...")
                             conv_service = get_conversation_service()
@@ -199,7 +179,6 @@ class MessageListenerService:
             print(f"[MessageListener] Error in _process_trigger_message: {e}")
 
     async def start_listener_for_userbot(self, userbot_id: str, phone: str, trusted_id: int):
-        """Start message listener for a specific userbot"""
         try:
             session_path = self._find_session_by_phone(phone)
             if not session_path:
@@ -219,14 +198,27 @@ class MessageListenerService:
                 await client.disconnect()
                 return
 
-            # Store active client
             self.active_listeners[userbot_id] = client
 
             print(f"[MessageListener] Started listening for userbot {phone} (trusted_id: {trusted_id})")
 
-            # Handler for new messages
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(Member, Group)
+                    .join(Group, Member.group_id == Group.id)
+                    .where(
+                        Member.userbot_id == UUID(userbot_id),
+                        Member.is_admin == True,
+                        Group.is_active == True
+                    )
+                )
+                admin_groups = result.all()
+                group_chat_ids = [group.telegram_id for _, group in admin_groups]
+
+            print(f"[MessageListener] Listening to {len(group_chat_ids)} groups: {group_chat_ids}")
+
             @client.on(events.NewMessage(from_users=trusted_id))
-            async def message_handler(event):
+            async def trusted_message_handler(event):
                 try:
                     message_text = event.message.message
                     sender = await event.get_sender()
@@ -240,14 +232,12 @@ class MessageListenerService:
 
                     print(f"[MessageListener] Received message from {trusted_id} to {phone}: {message_text[:50]}...")
 
-                    # Save trigger message from trusted user
                     trigger_msg_id = await self._save_message(
                         message_text=message_text,
                         userbot_id=UUID(userbot_id),
                         additional_info=additional_info
                     )
 
-                    # Process trigger message: generate and send to groups
                     if trigger_msg_id:
                         print(f"[MessageListener] Processing trigger message for groups...")
                         await self._process_trigger_message(
@@ -258,9 +248,81 @@ class MessageListenerService:
                         )
 
                 except Exception as e:
-                    print(f"[MessageListener] Error handling message: {e}")
+                    print(f"[MessageListener] Error handling trusted message: {e}")
 
-            # Keep client running
+            if group_chat_ids:
+                print(f"[MessageListener] Registering group handler for chats: {group_chat_ids}")
+
+                @client.on(events.NewMessage(chats=group_chat_ids))
+                async def group_message_handler(event):
+                    try:
+                        print(f"[MessageListener] Group message event triggered in chat {event.chat_id}")
+
+                        sender = await event.get_sender()
+                        if not sender or not hasattr(sender, 'id'):
+                            print(f"[MessageListener] Skipping message - no sender info")
+                            return
+
+                        message_text = event.message.message
+                        if not message_text:
+                            print(f"[MessageListener] Skipping message - no text content")
+                            return
+
+                        chat_id = event.chat_id
+                        async with async_session_maker() as db:
+                            result = await db.execute(
+                                select(Group).where(
+                                    Group.telegram_id == chat_id,
+                                    Group.is_active == True
+                                )
+                            )
+                            group = result.scalar_one_or_none()
+
+                            if not group:
+                                print(f"[MessageListener] Group not found or not active for chat_id {chat_id}")
+                                return
+
+                            existing_result = await db.execute(
+                                select(ChatHistory).where(
+                                    ChatHistory.telegram_message_id == event.message.id,
+                                    ChatHistory.group_id == group.id
+                                )
+                            )
+                            existing_message = existing_result.scalar_one_or_none()
+
+                            if existing_message:
+                                is_auto_generated = existing_message.additional_info.get("auto_generated", False)
+                                if is_auto_generated:
+                                    print(f"[MessageListener] Skipping message from userbot (already in chat_history)")
+                                    return
+
+                            chat_entry = ChatHistory(
+                                group_id=group.id,
+                                userbot_id=UUID(userbot_id),
+                                message=message_text,
+                                telegram_message_id=event.message.id,
+                                additional_info={
+                                    "sender_id": sender.id,
+                                    "sender_name": getattr(sender, 'first_name', 'Unknown'),
+                                    "sender_username": getattr(sender, 'username', None),
+                                    "from_real_user": True,
+                                    "date": event.message.date.isoformat() if event.message.date else None
+                                }
+                            )
+                            db.add(chat_entry)
+                            await db.commit()
+
+                            print(f"[MessageListener] ✓ Saved user message from {getattr(sender, 'first_name', 'Unknown')} in group '{group.name}': {message_text[:50]}...")
+
+                    except Exception as e:
+                        print(f"[MessageListener] Error handling group message: {e}")
+                        import traceback
+                        traceback.print_exc()
+
+                print(f"[MessageListener] ✓ Group message handler registered for {len(group_chat_ids)} groups")
+            else:
+                print(f"[MessageListener] No groups to listen to for userbot {phone}")
+
             await client.run_until_disconnected()
 
         except Exception as e:
@@ -270,16 +332,13 @@ class MessageListenerService:
                 del self.active_listeners[userbot_id]
 
     async def start_all_listeners(self):
-        """Start listeners for all admin userbots with trusted_id"""
         try:
             async with async_session_maker() as db:
-                # Get all members who are admins
                 result = await db.execute(
                     select(Member).where(Member.is_admin == True)
                 )
                 admin_members = result.scalars().all()
 
-                # Get userbots for these admins with trusted_id set
                 for member in admin_members:
                     userbot_result = await db.execute(
                         select(Userbot).where(
@@ -293,11 +352,9 @@ class MessageListenerService:
                     if userbot:
                         userbot_id_str = str(userbot.id)
 
-                        # Skip if already listening
                         if userbot_id_str in self.listener_tasks:
                             continue
 
-                        # Start listener in background
                         task = asyncio.create_task(
                             self.start_listener_for_userbot(
                                 userbot_id_str,
@@ -315,7 +372,6 @@ class MessageListenerService:
             print(f"[MessageListener] Error starting listeners: {e}")
 
     async def stop_listener_for_userbot(self, userbot_id: str):
-        """Stop listener for a specific userbot"""
         if userbot_id in self.active_listeners:
             client = self.active_listeners[userbot_id]
             await client.disconnect()
@@ -333,14 +389,12 @@ class MessageListenerService:
         print(f"[MessageListener] Stopped listener for userbot {userbot_id}")
 
     async def stop_all_listeners(self):
-        """Stop all active listeners"""
         for userbot_id in list(self.listener_tasks.keys()):
             await self.stop_listener_for_userbot(userbot_id)
 
         print("[MessageListener] All listeners stopped")
 
     def get_active_listeners_count(self) -> int:
-        """Get number of active listeners"""
         return len(self.active_listeners)
 
 

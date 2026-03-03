@@ -6,7 +6,6 @@ from database.managers.base_manager import BaseManager
 
 
 class UserBotsManager(BaseManager[Userbot]):
-    """Менеджер для роботи з юзерботами"""
 
     def __init__(self):
         super().__init__(Userbot)
@@ -16,16 +15,6 @@ class UserBotsManager(BaseManager[Userbot]):
         db: AsyncSession,
         phone_number: str
     ) -> Optional[Userbot]:
-        """
-        Отримати юзербота за номером телефону
-
-        Args:
-            db: Async database session
-            phone_number: Номер телефону
-
-        Returns:
-            Об'єкт Userbot або None
-        """
         result = await db.execute(
             select(self.model).where(self.model.phone_number == phone_number)
         )
@@ -36,16 +25,6 @@ class UserBotsManager(BaseManager[Userbot]):
         db: AsyncSession,
         username: str
     ) -> Optional[Userbot]:
-        """
-        Отримати юзербота за username
-
-        Args:
-            db: Async database session
-            username: Username (без @)
-
-        Returns:
-            Об'єкт Userbot або None
-        """
         result = await db.execute(
             select(self.model).where(self.model.username == username)
         )
@@ -57,17 +36,6 @@ class UserBotsManager(BaseManager[Userbot]):
         phone_number: Optional[str] = None,
         username: Optional[str] = None
     ) -> Optional[Userbot]:
-        """
-        Знайти юзербота за телефоном або username
-
-        Args:
-            db: Async database session
-            phone_number: Номер телефону (опціонально)
-            username: Username (опціонально)
-
-        Returns:
-            Об'єкт Userbot або None
-        """
         if not phone_number and not username:
             return None
 
@@ -88,17 +56,6 @@ class UserBotsManager(BaseManager[Userbot]):
         skip: int = 0,
         limit: int = 100
     ) -> List[Userbot]:
-        """
-        Отримати всіх юзерботів, які мають номер телефону
-
-        Args:
-            db: Async database session
-            skip: Скільки записів пропустити
-            limit: Максимальна кількість записів
-
-        Returns:
-            Список юзерботів з номерами телефонів
-        """
         result = await db.execute(
             select(self.model)
             .where(self.model.phone_number.isnot(None))
@@ -114,17 +71,6 @@ class UserBotsManager(BaseManager[Userbot]):
         query: str,
         limit: int = 10
     ) -> List[Userbot]:
-        """
-        Пошук юзерботів за ім'ям
-
-        Args:
-            db: Async database session
-            query: Пошуковий запит
-            limit: Максимальна кількість результатів
-
-        Returns:
-            Список знайдених юзерботів
-        """
         result = await db.execute(
             select(self.model)
             .where(self.model.name.ilike(f"%{query}%"))
@@ -138,16 +84,6 @@ class UserBotsManager(BaseManager[Userbot]):
         db: AsyncSession,
         userbots_data: List[dict]
     ) -> List[Userbot]:
-        """
-        Масове створення юзерботів
-
-        Args:
-            db: Async database session
-            userbots_data: Список словників з даними юзерботів
-
-        Returns:
-            Список створених юзерботів
-        """
         instances = []
         for data in userbots_data:
             instance = self.model(**data)
@@ -167,22 +103,9 @@ class UserBotsManager(BaseManager[Userbot]):
         name: Optional[str] = None,
         username: Optional[str] = None
     ) -> Optional[Userbot]:
-        """
-        Оновити дані юзербота з Telegram або створити якщо не існує
-
-        Args:
-            db: Async database session
-            phone_number: Номер телефону
-            name: Ім'я з Telegram
-            username: Username з Telegram
-
-        Returns:
-            Оновлений або створений Userbot
-        """
         existing = await self.get_by_phone(db, phone_number)
 
         if existing:
-            # Оновити існуючого
             update_data = {}
             if name:
                 update_data['name'] = name
@@ -193,7 +116,6 @@ class UserBotsManager(BaseManager[Userbot]):
                 return await self.update(db, existing.id, **update_data)
             return existing
         else:
-            # Створити нового
             return await self.create(
                 db,
                 phone_number=phone_number,

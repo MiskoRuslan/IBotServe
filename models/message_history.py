@@ -28,6 +28,5 @@ class MessageHistory(BaseModel):
         server_default="{}"
     )
 
-    # Relationships
     userbot: Mapped["Userbot"] = relationship("Userbot", backref="message_history")
     group: Mapped["Group"] = relationship("Group", backref="message_history")

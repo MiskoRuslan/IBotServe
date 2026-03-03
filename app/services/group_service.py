@@ -34,17 +34,6 @@ class GroupService:
         group_name: str,
         members_info: List[Dict[str, str]]
     ) -> int:
-        """
-        Створити супергрупу в Telegram та додати учасників
-
-        Args:
-            admin_phone: Номер телефону адміна (який створює групу)
-            group_name: Назва групи
-            members_info: Список словників [{"phone": "+380...", "name": "John Doe"}, ...]
-
-        Returns:
-            int: Telegram chat_id створеної супергрупи (негативне число, наприклад -1001234567890)
-        """
         admin_session_path = self._find_session_by_phone(admin_phone)
 
         client = TelegramClient(
@@ -55,8 +44,6 @@ class GroupService:
 
         try:
             await client.connect()
-
-            # ─── 1. Додати номери в контакти (полегшує подальший пошук) ───
             print("Імпорт контактів...")
             contacts = []
             for i, info in enumerate(members_info):
@@ -75,9 +62,7 @@ class GroupService:
 
             if contacts:
                 await client(ImportContactsRequest(contacts))
-                await asyncio.sleep(1.2)  # невелика пауза після імпорту
-
-            # ─── 2. Отримати InputUser для всіх учасників ───
+                await asyncio.sleep(1.2)
             users_input = []
             for info in members_info:
                 phone = info.get('phone', '').strip()
@@ -94,21 +79,18 @@ class GroupService:
             if not users_input:
                 raise ValueError("Не вдалося отримати жодного дійсного користувача")
 
-            # ─── 3. Створити супергрупу (megagroup=True) ───
             print(f"Створюємо супергрупу '{group_name}'...")
             created = await client(CreateChannelRequest(
                 title=group_name,
                 about="",
-                megagroup=True  # ← це ключовий момент!
+                megagroup=True
             ))
 
-            # Отримуємо entity щойно створеної групи
             group = created.chats[0]
             group_input = await client.get_input_entity(group)
 
             print(f"Створено супергрупу: {group.title} | ID: {group.id} | chat_id: {-1000000000000 - group.id}")
 
-            # ─── 4. Додавання учасників (крім себе, якщо ти вже там) ───
             added = 0
             failed = 0
 
@@ -135,7 +117,7 @@ class GroupService:
                 except PeerFloodError:
                     print("!!! FLOOD WAIT — треба чекати кілька хвилин/годин !!!")
                     failed += 1
-                    await asyncio.sleep(180)  # хоча б 2 хв
+                    await asyncio.sleep(180)
                 except ChatAdminRequiredError:
                     print("!!! Потрібні права адміністратора (додавання учасників) !!!")
                     raise
@@ -152,7 +134,7 @@ class GroupService:
             print(f"Не вдалося:              {failed}")
             print("═" * 50)
 
-            return -1000000000000 - group.id   # стандартний формат chat_id для супергруп
+            return -1000000000000 - group.id
 
         finally:
             if client.is_connected():

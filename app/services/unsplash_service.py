@@ -8,8 +8,6 @@ load_dotenv()
 
 
 class UnsplashService:
-    """Service for fetching photos from Unsplash API"""
-
     def __init__(self):
         self.access_key = os.getenv('UNSPLASH_ACCESS_KEY')
         self.api_url = "https://api.unsplash.com/photos/random"
@@ -20,32 +18,12 @@ class UnsplashService:
             print("[UnsplashService] Add UNSPLASH_ACCESS_KEY to .env or docker-compose.yml to enable")
 
     def extract_keywords(self, text: str) -> str:
-        """
-        Extract meaningful keywords from text for image search.
-        Makes photos look more casual/funny/meme-like as if from user's gallery.
-        """
         import random
 
-        # Remove URLs, mentions, hashtags
         text = re.sub(r'http\S+|@\S+|#\S+', '', text)
 
-        # Expanded keywords with car-specific terms
-        # Ukrainian keywords
         ukr_keywords = {
-            # Cars & auto
             'автомобіль': 'car', 'машина': 'car', 'авто': 'car',
-            'мерседес': 'mercedes', 'мерс': 'mercedes', 'бмв': 'bmw',
-            'w204': 'mercedes', 'w205': 'mercedes', 'w212': 'mercedes',
-            'w213': 'mercedes', 'w221': 'mercedes', 'w222': 'mercedes',
-            'двигун': 'car engine', 'мотор': 'engine',
-            'тюнінг': 'car tuning', 'чіп': 'car tuning',
-            'підвіска': 'car suspension', 'гальма': 'car brakes',
-            'колеса': 'car wheels', 'шини': 'tires',
-            'бампер': 'car bumper', 'фара': 'car lights',
-            'салон': 'car interior', 'багажник': 'car trunk',
-            'двері': 'car door', 'капот': 'car hood',
-            'гбо': 'car lpg', 'газ': 'car gas',
-            'акумулятор': 'car battery', 'стартер': 'car starter',
             # Nature & places
             'природа': 'nature', 'ліс': 'forest', 'дерево': 'tree',
             'місто': 'city street', 'будинок': 'building', 'вулиця': 'street',
@@ -69,17 +47,6 @@ class UnsplashService:
         # Russian keywords (similar expanded set)
         rus_keywords = {
             'автомобиль': 'car', 'машина': 'car', 'авто': 'car',
-            'мерседес': 'mercedes', 'мерс': 'mercedes', 'бмв': 'bmw',
-            'w204': 'mercedes', 'w205': 'mercedes', 'w212': 'mercedes',
-            'w213': 'mercedes', 'w221': 'mercedes', 'w222': 'mercedes',
-            'двигатель': 'car engine', 'мотор': 'engine',
-            'тюнинг': 'car tuning', 'чип': 'car tuning',
-            'подвеска': 'car suspension', 'тормоза': 'car brakes',
-            'колеса': 'car wheels', 'шины': 'tires',
-            'бампер': 'car bumper', 'фара': 'car lights',
-            'салон': 'car interior', 'багажник': 'car trunk',
-            'гбо': 'car lpg', 'газ': 'car gas',
-            'аккумулятор': 'car battery',
             'природа': 'nature', 'лес': 'forest',
             'город': 'city street', 'улица': 'street',
             'море': 'sea', 'пляж': 'beach',
@@ -91,44 +58,28 @@ class UnsplashService:
             'путешествие': 'travel',
         }
 
-        # Combine dictionaries
         all_keywords = {**ukr_keywords, **rus_keywords}
 
-        # Convert to lowercase for matching
         text_lower = text.lower()
 
-        # Find first matching keyword
         base_keyword = None
         for keyword, english in all_keywords.items():
             if keyword in text_lower:
                 base_keyword = english
                 break
 
-        # If no keyword found, use random casual keyword
         if not base_keyword:
-            casual_keywords = ['car', 'city street', 'coffee', 'sunset', 'nature']
+            casual_keywords = ['car', 'work', 'coffee', 'sunset', 'nature']
             base_keyword = random.choice(casual_keywords)
 
-        # Add variation to make photos more casual/meme-like
-        # 50% chance to add "meme" or "funny" modifier
         if random.random() < 0.5:
             modifiers = ['meme', 'funny', 'humor']
             modifier = random.choice(modifiers)
             return f"{base_keyword} {modifier}"
         else:
-            # Otherwise return base keyword
             return base_keyword
 
     async def get_random_photo(self, keyword: Optional[str] = None) -> Optional[dict]:
-        """
-        Fetch a random photo from Unsplash.
-
-        Args:
-            keyword: Search keyword (optional)
-
-        Returns:
-            Dict with photo info or None if failed
-        """
         if not self.enabled:
             return None
 
@@ -178,10 +129,6 @@ class UnsplashService:
             return None
 
     async def trigger_download(self, download_url: str):
-        """
-        Trigger download endpoint as required by Unsplash API guidelines.
-        This is required to give proper attribution.
-        """
         try:
             headers = {
                 "Authorization": f"Client-ID {self.access_key}"
@@ -189,7 +136,6 @@ class UnsplashService:
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(download_url, headers=headers) as response:
-                    # We don't need the response, just trigger the endpoint
                     pass
         except Exception as e:
             print(f"[UnsplashService] Error triggering download: {e}")

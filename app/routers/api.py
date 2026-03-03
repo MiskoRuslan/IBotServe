@@ -162,9 +162,6 @@ async def update_data(db: AsyncSession = Depends(get_db)):
 
 @router.post("/groups/create", response_model=CreateGroupResponse)
 async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Створити групу в Telegram та додати учасників
-    """
     try:
         # Отримати адміна з БД
         admin_result = await db.execute(
@@ -181,7 +178,6 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
                 detail="Admin userbot does not have a phone number"
             )
 
-        # Отримати учасників з БД
         members_info = []
         for member_id in request.member_ids:
             member_result = await db.execute(
@@ -201,14 +197,12 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
                 detail="No valid members found with phone numbers"
             )
 
-        # Створити групу через Telethon
         telegram_chat_id = await group_service.create_group_with_members(
             admin_phone=admin.phone_number,
             group_name=request.name,
             members_info=members_info
         )
 
-        # Зберегти групу в БД
         new_group = Group(
             name=request.name,
             telegram_id=telegram_chat_id,
@@ -221,7 +215,6 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
         db.add(new_group)
         await db.flush()
 
-        # Додати адміна до members з is_admin=True
         admin_member = Member(
             userbot_id=UUID(request.admin_id),
             group_id=new_group.id,
@@ -229,7 +222,6 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
         )
         db.add(admin_member)
 
-        # Додати інших учасників до БД з is_admin=False
         for member_id in request.member_ids:
             member = Member(
                 userbot_id=UUID(member_id),
@@ -256,9 +248,6 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
 
 @router.get("/groups")
 async def get_groups(db: AsyncSession = Depends(get_db)):
-    """
-    Отримати всі групи з мемберами
-    """
     try:
         result = await db.execute(
             select(Group).order_by(Group.created_at.desc())
@@ -267,13 +256,11 @@ async def get_groups(db: AsyncSession = Depends(get_db)):
 
         groups_data = []
         for group in groups:
-            # Отримати мемберів групи
             members_result = await db.execute(
                 select(Member).where(Member.group_id == group.id)
             )
             members = members_result.scalars().all()
 
-            # Отримати дані юзерботів для кожного мембера
             members_data = []
             for member in members:
                 userbot_result = await db.execute(
@@ -291,7 +278,6 @@ async def get_groups(db: AsyncSession = Depends(get_db)):
                         "additional_prompt": member.additional_prompt or ""
                     })
 
-            # Отримати адміна
             admin_name = None
             if group.admin_id:
                 admin_result = await db.execute(
@@ -329,9 +315,6 @@ async def update_group_prompt(
     request: dict,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Оновити global_prompt групи
-    """
     try:
         result = await db.execute(
             select(Group).where(Group.id == UUID(group_id))
@@ -362,9 +345,6 @@ async def update_member_prompt(
     request: dict,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Оновити additional_prompt мембера
-    """
     try:
         result = await db.execute(
             select(Member).where(Member.id == UUID(member_id))
@@ -395,9 +375,6 @@ async def update_userbot_trusted_id(
     request: dict,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Оновити trusted_id юзербота
-    """
     try:
         result = await db.execute(
             select(Userbot).where(Userbot.id == UUID(userbot_id))
@@ -431,9 +408,6 @@ async def update_userbot_style_settings(
     request: dict,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Оновити style_settings юзербота
-    """
     try:
         result = await db.execute(
             select(Userbot).where(Userbot.id == UUID(userbot_id))
@@ -464,9 +438,6 @@ async def update_userbot_style_settings(
 
 @router.post("/listeners/start")
 async def start_listeners():
-    """
-    Запустити всі message listeners для адмінів з trusted_id
-    """
     try:
         await message_listener.start_all_listeners()
         return {
@@ -480,9 +451,6 @@ async def start_listeners():
 
 @router.post("/listeners/stop")
 async def stop_listeners():
-    """
-    Зупинити всі message listeners
-    """
     try:
         await message_listener.stop_all_listeners()
         return {
@@ -495,9 +463,6 @@ async def stop_listeners():
 
 @router.get("/listeners/status")
 async def get_listeners_status():
-    """
-    Отримати статус listeners
-    """
     return {
         "active_listeners": message_listener.get_active_listeners_count(),
         "listener_ids": list(message_listener.active_listeners.keys())
@@ -506,10 +471,6 @@ async def get_listeners_status():
 
 @router.get("/contacts/add-all")
 async def contact_all(db: AsyncSession = Depends(get_db)):
-    """
-    Add all userbots to each other's contacts
-    Uses Server-Sent Events for real-time progress
-    """
     async def event_generator():
         try:
             result = await db.execute(
@@ -575,9 +536,6 @@ async def toggle_group(
     group_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Toggle group active status (start/pause conversation)
-    """
     try:
         result = await db.execute(
             select(Group).where(Group.id == UUID(group_id))
@@ -618,9 +576,6 @@ async def update_group_settings(
     request: dict,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Update group conversation settings
-    """
     try:
         result = await db.execute(
             select(Group).where(Group.id == UUID(group_id))
@@ -630,7 +585,6 @@ async def update_group_settings(
         if not group:
             raise HTTPException(status_code=404, detail="Group not found")
 
-        # Update settings
         if "context_messages_count" in request:
             group.context_messages_count = int(request["context_messages_count"])
 
@@ -661,9 +615,6 @@ async def update_group_settings(
 
 @router.get("/stickers")
 async def get_global_stickers():
-    """
-    Get all available global stickers
-    """
     try:
         stickers = sticker_service.list_available_stickers()
         return {"stickers": stickers}
@@ -676,32 +627,24 @@ async def upload_sticker(
     emotion: str = Form(...),
     file: UploadFile = File(...)
 ):
-    """
-    Upload a TGS sticker file for a specific emotion
-    """
     try:
-        # Validate file extension
         if not file.filename or not file.filename.endswith('.tgs'):
             raise HTTPException(status_code=400, detail="File must be in .tgs format")
 
-        # Validate emotion
         if emotion not in sticker_service.VALID_EMOTIONS:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid emotion. Must be one of: {', '.join(sticker_service.VALID_EMOTIONS)}"
             )
 
-        # Read file content
         file_content = await file.read()
 
-        # Validate file size
         if len(file_content) > sticker_service.MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=400,
                 detail=f"File too large. Maximum size is {sticker_service.MAX_FILE_SIZE / 1024}KB"
             )
 
-        # Save sticker
         success = await sticker_service.save_sticker(file_content, emotion)
 
         if not success:
@@ -721,15 +664,10 @@ async def upload_sticker(
 
 @router.delete("/stickers/{emotion}")
 async def delete_sticker(emotion: str):
-    """
-    Delete a sticker for a specific emotion
-    """
     try:
-        # Validate emotion
         if emotion not in sticker_service.VALID_EMOTIONS:
             raise HTTPException(status_code=400, detail="Invalid emotion")
 
-        # Delete sticker
         success = await sticker_service.delete_sticker(emotion)
 
         if not success:

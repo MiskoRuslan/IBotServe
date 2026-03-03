@@ -11,11 +11,9 @@ from app.services.message_listener import message_listener
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     await init_db()
     print("[Startup] Database initialized")
 
-    # Start message listeners automatically
     try:
         await message_listener.start_all_listeners()
         print(f"[Startup] Message listeners started: {message_listener.get_active_listeners_count()} active")
@@ -24,14 +22,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
     try:
         await message_listener.stop_all_listeners()
         print("[Shutdown] All message listeners stopped")
     except Exception as e:
         print(f"[Shutdown] Error stopping listeners: {e}")
 
-    # Close database connections
     try:
         await engine.dispose()
         print("[Shutdown] Database connections closed")

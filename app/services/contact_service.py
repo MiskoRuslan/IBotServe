@@ -17,7 +17,6 @@ load_dotenv()
 
 
 class ContactService:
-    """Service for managing Telegram contacts"""
 
     def __init__(self, sessions_dir: str = "sessions"):
         self.sessions_dir = Path(sessions_dir)
@@ -28,7 +27,6 @@ class ContactService:
             raise ValueError("API_ID and API_HASH must be set in .env file")
 
     def _find_session_by_phone(self, phone: str) -> Optional[Path]:
-        """Find session file by phone number"""
         phone_clean = phone.lstrip('+')
         for variant in [f'+{phone_clean}', phone_clean]:
             p = self.sessions_dir / f"{variant}.session"
@@ -41,16 +39,6 @@ class ContactService:
         phone: str,
         contacts_info: List[Dict[str, str]]
     ) -> Dict[str, any]:
-        """
-        Add contacts for a single userbot
-
-        Args:
-            phone: Userbot phone number
-            contacts_info: List of dicts with 'phone' and 'name'
-
-        Returns:
-            Dict with 'success', 'added', 'failed', 'error'
-        """
         session_path = self._find_session_by_phone(phone)
 
         if not session_path:
@@ -143,15 +131,6 @@ class ContactService:
         self,
         userbots_data: List[Dict[str, any]]
     ) -> AsyncGenerator[Dict[str, any], None]:
-        """
-        Add all userbots to each other's contacts with progress updates
-
-        Args:
-            userbots_data: List of dicts with 'id', 'phone_number', 'name'
-
-        Yields:
-            Progress updates as dicts
-        """
         total_userbots = len(userbots_data)
         total_success = 0
         total_skipped = 0
