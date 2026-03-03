@@ -109,6 +109,43 @@ body {
     color: var(--text-muted);
 }
 
+.userbot-trusted {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.userbot-trusted em {
+    font-style: italic;
+}
+
+.btn-icon-small {
+    background: none;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+}
+
+.btn-icon-small:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.btn-danger {
+    background-color: var(--accent-danger);
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
 .loading {
     text-align: center;
     padding: 20px;

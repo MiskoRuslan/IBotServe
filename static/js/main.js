@@ -5,6 +5,8 @@ const API_BASE = '/api';
 const updateDataBtn = document.getElementById('update-data-btn');
 const createGroupBtn = document.getElementById('create-group-btn');
 const contactAllBtn = document.getElementById('contact-all-btn');
+const startListenersBtn = document.getElementById('start-listeners-btn');
+const stopListenersBtn = document.getElementById('stop-listeners-btn');
 const userbotsList = document.getElementById('userbots-list');
 const notificationEl = document.getElementById('notification');
 const totalUserbotsEl = document.getElementById('total-userbots');
@@ -73,6 +75,10 @@ async function loadUserbots() {
                 </div>
                 <div class="userbot-phone">
                     ${bot.phone_number || 'No phone'}
+                </div>
+                <div class="userbot-trusted">
+                    Trusted ID: ${bot.trusted_id || '<em>Not set</em>'}
+                    <button class="btn-icon-small" onclick="editTrustedId('${bot.id}', ${bot.trusted_id || 'null'})" title="Edit trusted ID">✏️</button>
                 </div>
             </div>
         `).join('');
@@ -437,6 +443,112 @@ modal.addEventListener('click', (e) => {
     }
 });
 
+// Trusted ID Management
+async function editTrustedId(userbotId, currentTrustedId) {
+    const newTrustedId = prompt('Enter Trusted ID (Telegram user ID):', currentTrustedId || '');
+
+    if (newTrustedId === null) return; // User cancelled
+
+    try {
+        const response = await fetch(`${API_BASE}/userbots/${userbotId}/trusted-id`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                trusted_id: newTrustedId || null
+            })
+        });
+
+        if (response.ok) {
+            showNotification('Trusted ID updated successfully', 'success');
+            await loadUserbots();
+        } else {
+            const data = await response.json();
+            showNotification(data.detail || 'Failed to update trusted ID', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating trusted ID:', error);
+        showNotification('Failed to update trusted ID', 'error');
+    }
+}
+
+// Listeners Management
+async function startListeners() {
+    try {
+        startListenersBtn.disabled = true;
+        startListenersBtn.innerHTML = '<span class="btn-icon">⏳</span> Starting...';
+
+        const response = await fetch(`${API_BASE}/listeners/start`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification(`Listeners started! Active: ${data.active_listeners}`, 'success');
+            startListenersBtn.style.display = 'none';
+            stopListenersBtn.style.display = 'inline-block';
+        } else {
+            showNotification(data.detail || 'Failed to start listeners', 'error');
+        }
+    } catch (error) {
+        console.error('Error starting listeners:', error);
+        showNotification('Failed to start listeners', 'error');
+    } finally {
+        startListenersBtn.disabled = false;
+        startListenersBtn.innerHTML = '<span class="btn-icon">▶️</span> Start Listeners';
+    }
+}
+
+async function stopListeners() {
+    try {
+        stopListenersBtn.disabled = true;
+        stopListenersBtn.innerHTML = '<span class="btn-icon">⏳</span> Stopping...';
+
+        const response = await fetch(`${API_BASE}/listeners/stop`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showNotification('Listeners stopped successfully', 'success');
+            stopListenersBtn.style.display = 'none';
+            startListenersBtn.style.display = 'inline-block';
+        } else {
+            showNotification(data.detail || 'Failed to stop listeners', 'error');
+        }
+    } catch (error) {
+        console.error('Error stopping listeners:', error);
+        showNotification('Failed to stop listeners', 'error');
+    } finally {
+        stopListenersBtn.disabled = false;
+        stopListenersBtn.innerHTML = '<span class="btn-icon">⏹️</span> Stop Listeners';
+    }
+}
+
+async function checkListenersStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/listeners/status`);
+        const data = await response.json();
+
+        if (data.active_listeners > 0) {
+            startListenersBtn.style.display = 'none';
+            stopListenersBtn.style.display = 'inline-block';
+        } else {
+            startListenersBtn.style.display = 'inline-block';
+            stopListenersBtn.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking listeners status:', error);
+    }
+}
+
+// Listeners Event Listeners
+startListenersBtn.addEventListener('click', startListeners);
+stopListenersBtn.addEventListener('click', stopListeners);
+
 // Edit Group Prompt Modal Event Listeners
 editGroupPromptClose.addEventListener('click', closeEditGroupPromptModal);
 editGroupPromptCancel.addEventListener('click', closeEditGroupPromptModal);
@@ -463,6 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadUserbots();
     await loadStats();
     await loadGroups();
+    await checkListenersStatus();
 });
 
 setInterval(loadStats, 30000);

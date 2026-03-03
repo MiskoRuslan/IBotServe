@@ -7,6 +7,7 @@ from models import Userbot, Group, Member
 from app.services.session_service import SessionService
 from app.services.group_service import GroupService
 from app.services.contact_service import ContactService
+from app.services.message_listener import message_listener
 from database.managers.contacts_manager import ContactsManager
 from typing import List
 from pydantic import BaseModel
@@ -370,6 +371,84 @@ async def update_member_prompt(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating member prompt: {str(e)}")
+
+
+@router.put("/userbots/{userbot_id}/trusted-id")
+async def update_userbot_trusted_id(
+    userbot_id: str,
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Оновити trusted_id юзербота
+    """
+    try:
+        result = await db.execute(
+            select(Userbot).where(Userbot.id == UUID(userbot_id))
+        )
+        userbot = result.scalar_one_or_none()
+
+        if not userbot:
+            raise HTTPException(status_code=404, detail="Userbot not found")
+
+        trusted_id = request.get("trusted_id")
+        if trusted_id is not None:
+            userbot.trusted_id = int(trusted_id) if trusted_id else None
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Trusted ID updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating trusted ID: {str(e)}")
+
+
+@router.post("/listeners/start")
+async def start_listeners():
+    """
+    Запустити всі message listeners для адмінів з trusted_id
+    """
+    try:
+        await message_listener.start_all_listeners()
+        return {
+            "success": True,
+            "message": "Listeners started successfully",
+            "active_listeners": message_listener.get_active_listeners_count()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting listeners: {str(e)}")
+
+
+@router.post("/listeners/stop")
+async def stop_listeners():
+    """
+    Зупинити всі message listeners
+    """
+    try:
+        await message_listener.stop_all_listeners()
+        return {
+            "success": True,
+            "message": "All listeners stopped"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error stopping listeners: {str(e)}")
+
+
+@router.get("/listeners/status")
+async def get_listeners_status():
+    """
+    Отримати статус listeners
+    """
+    return {
+        "active_listeners": message_listener.get_active_listeners_count(),
+        "listener_ids": list(message_listener.active_listeners.keys())
+    }
 
 
 @router.get("/contacts/add-all")

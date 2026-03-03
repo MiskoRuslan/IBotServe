@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import String, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.base import BaseModel
 
@@ -9,6 +9,7 @@ class Userbot(BaseModel):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String, nullable=True)
     username: Mapped[str | None] = mapped_column(String, nullable=True)
+    trusted_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     members: Mapped[list["Member"]] = relationship(
         "Member",

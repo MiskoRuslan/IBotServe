@@ -10,7 +10,7 @@ from alembic import context
 
 # Import models for autogenerate support
 from models.base import Base
-from models import Userbot, Group, Member, Contact
+from models import Userbot, Group, Member, Contact, MessageHistory
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
