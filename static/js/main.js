@@ -4,6 +4,7 @@ const API_BASE = '/api';
 // Елементи DOM
 const updateDataBtn = document.getElementById('update-data-btn');
 const createGroupBtn = document.getElementById('create-group-btn');
+const contactAllBtn = document.getElementById('contact-all-btn');
 const userbotsList = document.getElementById('userbots-list');
 const notificationEl = document.getElementById('notification');
 const totalUserbotsEl = document.getElementById('total-userbots');
@@ -16,6 +17,18 @@ const cancelBtn = document.getElementById('cancel-btn');
 const createGroupForm = document.getElementById('create-group-form');
 const adminSelect = document.getElementById('admin-userbot');
 const memberCheckboxGroup = document.getElementById('member-userbots');
+const progressModal = document.getElementById('contact-progress-modal');
+const progressModalClose = document.getElementById('progress-modal-close');
+const progressCloseBtn = document.getElementById('progress-close-btn');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const progressPercentage = document.getElementById('progress-percentage');
+const currentUserbotEl = document.getElementById('current-userbot');
+const progressCountEl = document.getElementById('progress-count');
+const successCountEl = document.getElementById('success-count');
+const skippedCountEl = document.getElementById('skipped-count');
+const errorCountEl = document.getElementById('error-count');
+const progressLog = document.getElementById('progress-log');
 
 let availableUserbots = [];
 
@@ -259,3 +272,143 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 setInterval(loadStats, 30000);
+
+// Contact All Progress Modal Functions
+function openProgressModal() {
+    progressModal.classList.remove('hidden');
+    progressModalClose.disabled = true;
+    progressCloseBtn.disabled = true;
+
+    progressBar.style.width = '0%';
+    progressText.textContent = 'Initializing...';
+    progressPercentage.textContent = '0%';
+    currentUserbotEl.textContent = '-';
+    progressCountEl.textContent = '0 / 0';
+    successCountEl.textContent = '0';
+    skippedCountEl.textContent = '0';
+    errorCountEl.textContent = '0';
+    progressLog.innerHTML = '';
+}
+
+function closeProgressModal() {
+    progressModal.classList.add('hidden');
+}
+
+function addProgressLog(message, type = 'info') {
+    const logEntry = document.createElement('div');
+    logEntry.className = `progress-log-entry ${type}`;
+    logEntry.textContent = message;
+    progressLog.appendChild(logEntry);
+    progressLog.scrollTop = progressLog.scrollHeight;
+}
+
+async function startContactAll() {
+    try {
+        contactAllBtn.disabled = true;
+        contactAllBtn.innerHTML = '<span class="btn-icon">⏳</span> Processing...';
+
+        openProgressModal();
+
+        const eventSource = new EventSource(`${API_BASE}/contacts/add-all`);
+
+        let totalUserbots = 0;
+        let successCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            switch(data.type) {
+                case 'started':
+                    totalUserbots = data.total_userbots;
+                    progressText.textContent = data.message;
+                    progressCountEl.textContent = `0 / ${totalUserbots}`;
+                    addProgressLog(data.message, 'info');
+                    break;
+
+                case 'processing_userbot':
+                    const percentage = Math.round((data.current / data.total) * 100);
+                    progressBar.style.width = `${percentage}%`;
+                    progressPercentage.textContent = `${percentage}%`;
+                    currentUserbotEl.textContent = data.userbot_name;
+                    progressCountEl.textContent = `${data.current} / ${data.total}`;
+                    progressText.textContent = `Processing ${data.userbot_name}...`;
+                    addProgressLog(`Processing: ${data.userbot_name}`, 'info');
+                    break;
+
+                case 'userbot_completed':
+                    successCount++;
+                    successCountEl.textContent = successCount;
+                    addProgressLog(`✓ ${data.userbot_name}: Added ${data.added} contacts`, 'success');
+                    break;
+
+                case 'userbot_skipped':
+                    skippedCount++;
+                    skippedCountEl.textContent = skippedCount;
+                    addProgressLog(`⊘ ${data.userbot_name}: ${data.reason}`, 'warning');
+                    break;
+
+                case 'userbot_error':
+                    errorCount++;
+                    errorCountEl.textContent = errorCount;
+                    addProgressLog(`✗ ${data.userbot_name}: ${data.error}`, 'error');
+                    break;
+
+                case 'completed':
+                    progressBar.style.width = '100%';
+                    progressPercentage.textContent = '100%';
+                    progressText.textContent = data.message;
+                    addProgressLog(data.message, 'success');
+
+                    progressModalClose.disabled = false;
+                    progressCloseBtn.disabled = false;
+
+                    showNotification(
+                        `Contact all completed! Success: ${data.success}, Skipped: ${data.skipped}, Errors: ${data.errors}`,
+                        data.errors > 0 ? 'warning' : 'success'
+                    );
+
+                    eventSource.close();
+                    break;
+
+                case 'error':
+                    progressText.textContent = 'Error occurred';
+                    addProgressLog(`Error: ${data.message}`, 'error');
+                    progressModalClose.disabled = false;
+                    progressCloseBtn.disabled = false;
+                    showNotification(data.message, 'error');
+                    eventSource.close();
+                    break;
+            }
+        };
+
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            addProgressLog('Connection error occurred', 'error');
+            progressModalClose.disabled = false;
+            progressCloseBtn.disabled = false;
+            showNotification('Connection error during contact all', 'error');
+            eventSource.close();
+        };
+
+    } catch (error) {
+        console.error('Error starting contact all:', error);
+        showNotification('Failed to start contact all', 'error');
+        closeProgressModal();
+    } finally {
+        contactAllBtn.disabled = false;
+        contactAllBtn.innerHTML = '<span class="btn-icon">📞</span> Contact All';
+    }
+}
+
+// Contact All Event Listeners
+contactAllBtn.addEventListener('click', startContactAll);
+progressModalClose.addEventListener('click', closeProgressModal);
+progressCloseBtn.addEventListener('click', closeProgressModal);
+
+progressModal.addEventListener('click', (e) => {
+    if (e.target === progressModal && !progressCloseBtn.disabled) {
+        closeProgressModal();
+    }
+});

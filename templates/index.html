@@ -32,6 +32,10 @@
                         <span class="btn-icon">➕</span>
                         Create Group
                     </button>
+                    <button id="contact-all-btn" class="btn btn-info">
+                        <span class="btn-icon">📞</span>
+                        Contact All
+                    </button>
                     <button id="update-data-btn" class="btn btn-primary">
                         <span class="btn-icon">🔄</span>
                         Update Data
@@ -115,6 +119,55 @@
                     <button type="submit" class="btn btn-success">Create Group</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Contact All Progress Modal -->
+    <div id="contact-progress-modal" class="modal hidden">
+        <div class="modal-content progress-modal">
+            <div class="modal-header">
+                <h3>Adding Contacts</h3>
+                <button class="modal-close" id="progress-modal-close" disabled>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="progress-section">
+                    <div class="progress-info">
+                        <span id="progress-text">Initializing...</span>
+                        <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+
+                <div class="progress-details">
+                    <div class="progress-stat">
+                        <span class="progress-label">Current:</span>
+                        <span id="current-userbot">-</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Progress:</span>
+                        <span id="progress-count">0 / 0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Success:</span>
+                        <span id="success-count" class="success-text">0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Skipped:</span>
+                        <span id="skipped-count" class="warning-text">0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <span class="progress-label">Errors:</span>
+                        <span id="error-count" class="error-text">0</span>
+                    </div>
+                </div>
+
+                <div id="progress-log" class="progress-log"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="progress-close-btn" class="btn btn-primary" disabled>Close</button>
+            </div>
         </div>
     </div>
 

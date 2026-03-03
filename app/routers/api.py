@@ -1,17 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
 from models import Userbot, Group, Member
 from app.services.session_service import SessionService
 from app.services.group_service import GroupService
+from app.services.contact_service import ContactService
+from database.managers.contacts_manager import ContactsManager
 from typing import List
 from pydantic import BaseModel
 from uuid import UUID
+import json
 
 router = APIRouter(prefix="/api", tags=["api"])
 session_service = SessionService()
 group_service = GroupService()
+contact_service = ContactService()
+contacts_manager = ContactsManager()
 
 
 class UserbotResponse(BaseModel):
@@ -222,3 +228,69 @@ async def create_group(request: CreateGroupRequest, db: AsyncSession = Depends(g
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating group: {str(e)}")
+
+
+@router.get("/contacts/add-all")
+async def contact_all(db: AsyncSession = Depends(get_db)):
+    """
+    Add all userbots to each other's contacts
+    Uses Server-Sent Events for real-time progress
+    """
+    async def event_generator():
+        try:
+            result = await db.execute(
+                select(Userbot)
+                .where(Userbot.phone_number.isnot(None))
+                .order_by(Userbot.created_at)
+            )
+            userbots = result.scalars().all()
+
+            if not userbots:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'No userbots found'})}\n\n"
+                return
+
+            userbots_data = [
+                {
+                    'id': str(bot.id),
+                    'phone_number': bot.phone_number,
+                    'name': bot.name or bot.phone_number
+                }
+                for bot in userbots
+            ]
+
+            async for progress in contact_service.contact_all_userbots(userbots_data):
+                if progress['type'] == 'userbot_completed':
+                    userbot_id = UUID(userbots_data[progress['current'] - 1]['id'])
+
+                    other_ids = [
+                        UUID(bot['id']) for bot in userbots_data
+                        if bot['id'] != str(userbot_id)
+                    ]
+
+                    try:
+                        await contacts_manager.bulk_create_contacts(
+                            db, userbot_id, other_ids
+                        )
+                        await db.commit()
+                    except Exception as e:
+                        await db.rollback()
+                        print(f"Error saving contacts for {userbot_id}: {e}")
+
+                yield f"data: {json.dumps(progress)}\n\n"
+
+        except Exception as e:
+            error_msg = {
+                'type': 'error',
+                'message': f'Server error: {str(e)}'
+            }
+            yield f"data: {json.dumps(error_msg)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )

@@ -20,10 +20,12 @@ from database.managers.base_manager import BaseManager
 from database.managers.userbots_manager import UserBotsManager
 from database.managers.groups_manager import GroupsManager
 from database.managers.members_manager import MembersManager
+from database.managers.contacts_manager import ContactsManager
 
 __all__ = [
     "BaseManager",
     "UserBotsManager",
     "GroupsManager",
     "MembersManager",
+    "ContactsManager",
 ]

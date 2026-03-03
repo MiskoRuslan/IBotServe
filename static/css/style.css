@@ -494,3 +494,114 @@ form {
         max-height: 95vh;
     }
 }
+
+/* Progress Modal */
+.progress-modal {
+    min-width: 600px;
+    max-width: 700px;
+}
+
+.progress-section {
+    margin-bottom: 24px;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 24px;
+    background-color: var(--bg-tertiary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    transition: width 0.3s ease;
+}
+
+.progress-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.progress-stat {
+    display: flex;
+    justify-content: space-between;
+}
+
+.progress-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.success-text {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.warning-text {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.error-text {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.progress-log {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.progress-log-entry {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    border-radius: 3px;
+}
+
+.progress-log-entry.info {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+}
+
+.progress-log-entry.success {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+}
+
+.progress-log-entry.warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+}
+
+.progress-log-entry.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+}
+
+.btn-info {
+    background-color: #3b82f6;
+}
+
+.btn-info:hover {
+    background-color: #2563eb;
+}
