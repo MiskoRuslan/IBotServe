@@ -70,6 +70,7 @@ async def get_userbots(db: AsyncSession = Depends(get_db)):
                 "name": bot.name,
                 "phone_number": bot.phone_number,
                 "username": bot.username,
+                "trusted_id": bot.trusted_id,
                 "created_at": bot.created_at.isoformat()
             }
             for bot in userbots
