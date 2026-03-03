@@ -15,7 +15,7 @@ from database.config import async_session_maker
 from models import Group, Member, ChatHistory, Userbot, MessageHistory
 from app.services.grok_service import grok_service
 from app.services.unsplash_service import unsplash_service
-from database.managers.stickers_manager import StickersManager
+from app.services.sticker_service import StickerService
 import os
 from dotenv import load_dotenv
 
@@ -39,8 +39,8 @@ class ConversationService:
         # Track last message sender per group: group_id -> userbot_id
         self.last_sender: Dict[str, UUID] = {}
 
-        # Stickers manager
-        self.stickers_manager = StickersManager()
+        # Sticker service
+        self.sticker_service = StickerService()
 
         if not self.api_id or not self.api_hash:
             raise ValueError("API_ID and API_HASH must be set in .env file")
@@ -325,6 +325,11 @@ class ConversationService:
                 else:
                     context_parts.append(f"Use emojis RARELY (probability: {emoji_prob}%) - only occasionally")
                 context_parts.append("Examples: 😊 😂 👍 🔥 💪 😅 🤔 ❤️ 😢 😡 (use contextually appropriate emojis)")
+            else:
+                # Explicitly forbid emojis when probability is 0
+                context_parts.append("\n🚫 CRITICAL: DO NOT use emojis in your messages!")
+                context_parts.append("- Write plain text without any emoji symbols (😊 ❤️ 👍 etc.)")
+                context_parts.append("- Keep messages simple and emoji-free")
 
             # Keep ASCII emoticons as backup
             if style_settings.get("use_ascii_emoticons"):
@@ -662,14 +667,14 @@ class ConversationService:
         client: TelegramClient,
         group: Group,
         member: Member,
-        sticker_file_id: str,
+        sticker_path: Path,
         emotion: str
     ):
         """
-        Send a sticker to group using Telegram file_id
+        Send a sticker to group using local TGS file
 
         Args:
-            sticker_file_id: Telegram file_id of the sticker
+            sticker_path: Path to local TGS file
             emotion: Emotion tag of the sticker
         """
         try:
@@ -686,10 +691,10 @@ class ConversationService:
             ))
             await asyncio.sleep(typing_duration)
 
-            # Send sticker using file_id
+            # Send sticker using local file path
             sent_message = await client.send_file(
                 entity=entity,
-                file=sticker_file_id
+                file=str(sticker_path)
             )
 
             print(f"[ConversationService] Sticker ({emotion}) sent to '{group.name}'")
@@ -711,8 +716,7 @@ class ConversationService:
                                 "member_prompt": member.additional_prompt or "",
                                 "auto_generated": True,
                                 "message_type": "sticker",
-                                "emotion": emotion,
-                                "file_id": sticker_file_id
+                                "emotion": emotion
                             }
                         )
                         db.add(chat_entry)
@@ -726,8 +730,7 @@ class ConversationService:
                                 "telegram_message_id": sent_message.id,
                                 "auto_generated": True,
                                 "message_type": "sticker",
-                                "emotion": emotion,
-                                "file_id": sticker_file_id
+                                "emotion": emotion
                             }
                         )
                         db.add(message_entry)
@@ -861,28 +864,22 @@ class ConversationService:
                             )
 
                             if should_send_sticker:
-                                # Try to get available stickers for this userbot
                                 print(f"[ConversationService] Attempting to send sticker instead of text...")
 
-                                # Get stickers from database
-                                async with async_session_maker() as sticker_db:
-                                    available_stickers = await self.stickers_manager.get_stickers_for_userbot(
-                                        sticker_db,
-                                        selected_member.userbot_id
-                                    )
+                                # Get random available sticker from local files
+                                random_emotion = self.sticker_service.get_random_available_emotion()
 
-                                if available_stickers:
-                                    # Choose random sticker
-                                    random_sticker = random.choice(available_stickers)
-                                    print(f"[ConversationService] Sending sticker with emotion: {random_sticker.emotion}")
+                                if random_emotion:
+                                    sticker_path = self.sticker_service.get_sticker_path(random_emotion)
+                                    print(f"[ConversationService] Sending sticker with emotion: {random_emotion}")
 
-                                    # Send sticker
+                                    # Send sticker using local file
                                     await self._send_member_sticker(
                                         client=client,
                                         group=group,
                                         member=selected_member,
-                                        sticker_file_id=random_sticker.file_id,
-                                        emotion=random_sticker.emotion
+                                        sticker_path=sticker_path,
+                                        emotion=random_emotion
                                     )
                                 else:
                                     # No stickers available, fallback to text

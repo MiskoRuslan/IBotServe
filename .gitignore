@@ -213,3 +213,6 @@ ibotserve_backup.db
 *.db
 .idea
 .claude
+
+# Sticker files (keep directory structure)
+static/stickers/*.tgs

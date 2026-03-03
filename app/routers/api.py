@@ -10,10 +10,11 @@ from app.services.contact_service import ContactService
 from app.services.message_listener import message_listener
 from app.services.conversation_service import conversation_service
 from database.managers.contacts_manager import ContactsManager
-from database.managers.stickers_manager import StickersManager
+from app.services.sticker_service import StickerService
 from typing import List
 from pydantic import BaseModel
 from uuid import UUID
+from fastapi import UploadFile, File, Form
 import json
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -21,7 +22,7 @@ session_service = SessionService()
 group_service = GroupService()
 contact_service = ContactService()
 contacts_manager = ContactsManager()
-stickers_manager = StickersManager()
+sticker_service = StickerService()
 
 
 class UserbotResponse(BaseModel):
@@ -62,23 +63,6 @@ class CreateGroupResponse(BaseModel):
     telegram_id: int
     name: str
     message: str
-
-
-class CreateStickerRequest(BaseModel):
-    userbot_id: str
-    file_id: str
-    emotion: str
-
-
-class StickerResponse(BaseModel):
-    id: str
-    userbot_id: str
-    file_id: str
-    emotion: str
-    created_at: str
-
-    class Config:
-        from_attributes = True
 
 
 @router.get("/userbots")
@@ -675,116 +659,88 @@ async def update_group_settings(
         raise HTTPException(status_code=500, detail=f"Error updating group settings: {str(e)}")
 
 
-@router.get("/stickers/{userbot_id}")
-async def get_userbot_stickers(
-    userbot_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+@router.get("/stickers")
+async def get_global_stickers():
     """
-    Get all stickers for a userbot
+    Get all available global stickers
     """
     try:
-        # Check if userbot exists
-        result = await db.execute(
-            select(Userbot).where(Userbot.id == UUID(userbot_id))
-        )
-        userbot = result.scalar_one_or_none()
-
-        if not userbot:
-            raise HTTPException(status_code=404, detail="Userbot not found")
-
-        # Get stickers
-        stickers = await stickers_manager.get_stickers_for_userbot(db, UUID(userbot_id))
-
-        return {
-            "stickers": [
-                {
-                    "id": str(sticker.id),
-                    "userbot_id": str(sticker.userbot_id),
-                    "file_id": sticker.file_id,
-                    "emotion": sticker.emotion,
-                    "created_at": sticker.created_at.isoformat()
-                }
-                for sticker in stickers
-            ]
-        }
-
-    except HTTPException:
-        raise
+        stickers = sticker_service.list_available_stickers()
+        return {"stickers": stickers}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stickers: {str(e)}")
 
 
-@router.post("/stickers")
-async def create_sticker(
-    request: CreateStickerRequest,
-    db: AsyncSession = Depends(get_db)
+@router.post("/stickers/upload")
+async def upload_sticker(
+    emotion: str = Form(...),
+    file: UploadFile = File(...)
 ):
     """
-    Create a new sticker for a userbot
+    Upload a TGS sticker file for a specific emotion
     """
     try:
-        # Check if userbot exists
-        result = await db.execute(
-            select(Userbot).where(Userbot.id == UUID(request.userbot_id))
-        )
-        userbot = result.scalar_one_or_none()
+        # Validate file extension
+        if not file.filename or not file.filename.endswith('.tgs'):
+            raise HTTPException(status_code=400, detail="File must be in .tgs format")
 
-        if not userbot:
-            raise HTTPException(status_code=404, detail="Userbot not found")
+        # Validate emotion
+        if emotion not in sticker_service.VALID_EMOTIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid emotion. Must be one of: {', '.join(sticker_service.VALID_EMOTIONS)}"
+            )
 
-        # Create sticker
-        sticker = await stickers_manager.create_sticker(
-            db,
-            userbot_id=UUID(request.userbot_id),
-            file_id=request.file_id,
-            emotion=request.emotion
-        )
+        # Read file content
+        file_content = await file.read()
 
-        await db.commit()
+        # Validate file size
+        if len(file_content) > sticker_service.MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size is {sticker_service.MAX_FILE_SIZE / 1024}KB"
+            )
+
+        # Save sticker
+        success = await sticker_service.save_sticker(file_content, emotion)
+
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to save sticker. Invalid TGS format.")
 
         return {
             "success": True,
-            "message": "Sticker added successfully",
-            "sticker": {
-                "id": str(sticker.id),
-                "userbot_id": str(sticker.userbot_id),
-                "file_id": sticker.file_id,
-                "emotion": sticker.emotion,
-                "created_at": sticker.created_at.isoformat()
-            }
+            "message": f"Sticker for '{emotion}' uploaded successfully",
+            "emotion": emotion
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating sticker: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading sticker: {str(e)}")
 
 
-@router.delete("/stickers/{sticker_id}")
-async def delete_sticker(
-    sticker_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+@router.delete("/stickers/{emotion}")
+async def delete_sticker(emotion: str):
     """
-    Delete a sticker
+    Delete a sticker for a specific emotion
     """
     try:
-        deleted = await stickers_manager.delete_sticker(db, UUID(sticker_id))
+        # Validate emotion
+        if emotion not in sticker_service.VALID_EMOTIONS:
+            raise HTTPException(status_code=400, detail="Invalid emotion")
 
-        if not deleted:
+        # Delete sticker
+        success = await sticker_service.delete_sticker(emotion)
+
+        if not success:
             raise HTTPException(status_code=404, detail="Sticker not found")
 
-        await db.commit()
-
         return {
             "success": True,
-            "message": "Sticker deleted successfully"
+            "message": f"Sticker for '{emotion}' deleted successfully"
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting sticker: {str(e)}")
